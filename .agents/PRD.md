@@ -29,9 +29,9 @@
 
 
 
-## 5. 전체 레이아웃 (Global Layout)
+## 5. 프론트엔드 요구사항 (Frontend Requirements)
 
-### 5.1 전체 레이아웃
+### 5.1 전체 레이아웃 (Global Layout)
 
 1. **상단 네비게이션 바 (Header)** 
    - (공통) 홈 로고
