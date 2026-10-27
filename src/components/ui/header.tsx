@@ -31,7 +31,7 @@ const Header = () => {
         <Link href="/auth" className="hover:text-[#6B46C1] transition-colors">
           로그인
         </Link>
-        <Link href="/guest-check" className="hover:text-[#6B46C1] transition-colors">
+        <Link href="/guest-login" className="hover:text-[#6B46C1] transition-colors">
           비회원 주문 조회
         </Link>
         <Link href="/my-page" className="hover:text-[#6B46C1] transition-colors">
@@ -84,7 +84,7 @@ const Header = () => {
               <Link href="/auth" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
                 로그인
               </Link>
-              <Link href="/guest-check" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
+              <Link href="/guest-login" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
                 비회원 주문 조회
               </Link>
               <Link href="/my-page" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
