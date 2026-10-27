@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import Header from '@/components/ui/header';
-import Footer from '@/components/ui/footer';
 import {
   Search,
   FileText,
@@ -96,31 +94,27 @@ const GuestCheckPage = () => {
   // 비회원 세션이 없는 경우 안내 뷰
   if (!isLoading && !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#FDFBF7] text-[#1E1B2E] flex flex-col justify-between">
-        <Header />
-        <main className="flex-1 max-w-lg w-full mx-auto px-4 py-16 flex items-center justify-center">
-          <div className="bg-[#FAF8F5]/90 border border-[#E8E0D5] rounded-3xl p-8 text-center space-y-6 shadow-2xl shadow-purple-950/5 w-full">
-            <div className="w-16 h-16 rounded-2xl bg-[#2D1B4E] border border-amber-400/30 flex items-center justify-center mx-auto text-amber-300 shadow-md">
-              <Lock className="w-8 h-8" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-xl sm:text-2xl font-serif font-bold text-[#1E1B2E]">
-                비회원 인증이 필요합니다
-              </h1>
-              <p className="text-xs sm:text-sm text-[#5D576B] leading-relaxed">
-                주문 시 입력하신 휴대폰 번호와 비밀번호로 먼저 인증을 진행해 주세요.
-              </p>
-            </div>
-            <Link
-              href="/guest-login?next=/guest-check"
-              className="w-full h-12 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2D1B4E] to-[#1E1B2E] text-amber-300 font-bold text-sm shadow-md hover:shadow-lg transition-all"
-            >
-              <span>비회원 로그인하러 가기</span>
-              <ArrowRight className="w-4 h-4 text-amber-300" />
-            </Link>
+      <div className="max-w-lg w-full mx-auto px-4 py-16 flex items-center justify-center">
+        <div className="bg-[#FAF8F5]/90 border border-[#E8E0D5] rounded-3xl p-8 text-center space-y-6 shadow-2xl shadow-purple-950/5 w-full">
+          <div className="w-16 h-16 rounded-2xl bg-[#2D1B4E] border border-amber-400/30 flex items-center justify-center mx-auto text-amber-300 shadow-md">
+            <Lock className="w-8 h-8" />
           </div>
-        </main>
-        <Footer />
+          <div className="space-y-2">
+            <h1 className="text-xl sm:text-2xl font-serif font-bold text-[#1E1B2E]">
+              비회원 인증이 필요합니다
+            </h1>
+            <p className="text-xs sm:text-sm text-[#5D576B] leading-relaxed">
+              주문 시 입력하신 휴대폰 번호와 비밀번호로 먼저 인증을 진행해 주세요.
+            </p>
+          </div>
+          <Link
+            href="/guest-login?next=/guest-check"
+            className="w-full h-12 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#2D1B4E] to-[#1E1B2E] text-amber-300 font-bold text-sm shadow-md hover:shadow-lg transition-all"
+          >
+            <span>비회원 로그인하러 가기</span>
+            <ArrowRight className="w-4 h-4 text-amber-300" />
+          </Link>
+        </div>
       </div>
     );
   }
@@ -133,13 +127,11 @@ const GuestCheckPage = () => {
     : [];
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] text-[#1E1B2E] flex flex-col justify-between selection:bg-[#E8E0F8] selection:text-[#6B46C1] relative overflow-hidden">
+    <div className="relative overflow-hidden w-full selection:bg-[#E8E0F8] selection:text-[#6B46C1]">
       {/* 배경 은은한 오로라 글로우 */}
       <div className="absolute top-[-5%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-br from-[#E8E0F8]/50 to-[#F5E6CC]/30 blur-3xl pointer-events-none" />
 
-      <Header />
-
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10 space-y-6">
+      <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10 space-y-6">
         {/* 상단 비회원 정보 바 */}
         <div className="bg-[#FAF8F5]/90 border border-[#E8E0D5] rounded-2xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -323,9 +315,7 @@ const GuestCheckPage = () => {
             </div>
           </div>
         </section>
-      </main>
-
-      <Footer />
+      </div>
     </div>
   );
 };
