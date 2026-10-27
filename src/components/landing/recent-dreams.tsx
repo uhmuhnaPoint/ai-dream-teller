@@ -456,10 +456,12 @@ const RecentDreams = () => {
 
             {/* 모달 하단 전환 액션 버튼 */}
             <div className="mt-7 pt-4 border-t border-[#E8E0F8] flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5 text-xs text-[#716A89]">
-                <CheckCircle2 className="w-4 h-4 text-[#38A169]" />
-                <span>1,500원으로 나만의 심층 리포트 받기</span>
-              </div>
+              <Link
+                href={`/dream-result/${currentDream.id}`}
+                className="text-xs font-semibold text-[#6B46C1] hover:underline flex items-center gap-1"
+              >
+                <span>심층 해석 결과서 및 캘린더 전체 뷰로 보기 →</span>
+              </Link>
 
               <Link
                 href={`/dream-teller?field=${currentDream.fieldId}`}

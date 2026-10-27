@@ -12,8 +12,10 @@ import {
   Brain,
   Eye,
   Activity,
-  Layers
+  Layers,
+  Sparkles
 } from 'lucide-react';
+import DreamResultModal from '@/components/dream-result/dream-result-modal';
 
 interface SchoolOfThought {
   id: string;
@@ -67,6 +69,9 @@ const BentoGrid = () => {
   // 사용자가 4대 학문적 관점을 직접 눌러보며 신뢰감을 체감할 수 있도록 상태 관리
   const [activeSchoolId, setActiveSchoolId] = useState<string>('freud');
   const activeSchool = SCHOOLS.find((s) => s.id === activeSchoolId) || SCHOOLS[0];
+
+  // Card 2 클릭 시 해석 확인 페이지 팝업 뷰 열기 상태
+  const [isResultModalOpen, setIsResultModalOpen] = useState<boolean>(false);
 
   return (
     <section className="py-16 md:py-24 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
@@ -147,7 +152,18 @@ const BentoGrid = () => {
         </div>
 
         {/* Card 2: 펜시브의 재현 - 꿈의 시각화 (1컬럼 차지) */}
-        <div className="rounded-3xl border border-[#E8E0F8] bg-gradient-to-b from-[#FFFDF9] to-[#FAF8F5] p-6 sm:p-7 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between">
+        <div
+          onClick={() => setIsResultModalOpen(true)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsResultModalOpen(true);
+            }
+          }}
+          className="rounded-3xl border border-[#E8E0F8] bg-gradient-to-b from-[#FFFDF9] to-[#FAF8F5] p-6 sm:p-7 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between cursor-pointer group/card2 hover:border-[#D4AF37]/80 hover:-translate-y-1 relative"
+        >
           <div>
             <div className="flex items-center justify-between mb-4">
               <span className="inline-flex items-center gap-1.5 rounded-md bg-[#D53F8C]/10 px-2.5 py-1 text-xs font-semibold text-[#D53F8C]">
@@ -159,7 +175,7 @@ const BentoGrid = () => {
               </span>
             </div>
 
-            <h3 className="text-lg sm:text-xl font-bold text-[#1E1B2E] tracking-tight">
+            <h3 className="text-lg sm:text-xl font-bold text-[#1E1B2E] tracking-tight group-hover/card2:text-[#6B46C1] transition-colors">
               말로는 다 설명 못 할 그 장면, 눈앞의 예술로 복원하다
             </h3>
             <p className="mt-2 text-xs text-[#4B4562] leading-relaxed">
@@ -181,6 +197,15 @@ const BentoGrid = () => {
                 “꿈속에서 은빛으로 빛나던 펜시브와 하늘의 오로라”
               </span>
             </div>
+          </div>
+
+          {/* 하단 클릭 인터랙션 안내 뱃지 */}
+          <div className="mt-4 pt-3 border-t border-[#E8E0F8]/80 flex items-center justify-between text-xs font-bold text-[#6B46C1] group-hover/card2:text-[#553C9A]">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>실제 해석 확인 리포트 & 캘린더 보기</span>
+            </span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover/card2:translate-x-1" />
           </div>
         </div>
 
@@ -300,6 +325,13 @@ const BentoGrid = () => {
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
+
+      {/* Card 2 클릭 시 열리는 해석 확인 리포트 & 캘린더 모달 */}
+      <DreamResultModal
+        isOpen={isResultModalOpen}
+        onClose={() => setIsResultModalOpen(false)}
+        orderId="DREAM_PENSIEVE_HIGHLIGHT"
+      />
     </section>
   );
 };
