@@ -28,15 +28,26 @@ export const POST = async (request: Request) => {
     const callbackUrl = getAuthCallbackUrl(redirectTo);
     const supabase = await createClient();
 
+    const options: {
+      redirectTo: string;
+      scopes?: string;
+      queryParams?: Record<string, string>;
+    } = {
+      redirectTo: callbackUrl,
+      queryParams: {
+        prompt: 'select_account',
+      },
+    };
+
+    if (provider === 'kakao') {
+      options.scopes = 'profile_nickname';
+    }
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: {
-        redirectTo: callbackUrl,
-        queryParams: {
-          prompt: 'select_account',
-        },
-      },
+      options,
     });
+
 
     if (error) {
       console.error(`[API /api/auth/login] ${provider} OAuth URL 생성 오류:`, error.message);

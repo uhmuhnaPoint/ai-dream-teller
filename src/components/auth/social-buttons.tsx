@@ -72,16 +72,27 @@ export const SocialButtons = ({
       const callbackUrl = getAuthCallbackUrl(redirectTo);
 
       const supabase = createClient();
+      const options: {
+        redirectTo: string;
+        scopes?: string;
+        queryParams?: Record<string, string>;
+      } = {
+        redirectTo: callbackUrl,
+        queryParams: {
+          prompt: 'select_account',
+        },
+      };
+
+      // 카카오의 경우 account_email이 비즈니스 미인증 상태이므로 profile_nickname만 요청
+      if (provider === 'kakao') {
+        options.scopes = 'profile_nickname';
+      }
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: {
-          redirectTo: callbackUrl,
-          queryParams: {
-            // 카카오 추가 동의 필요 시 prompt: 'select_account'
-            prompt: 'select_account',
-          },
-        },
+        options,
       });
+
 
       if (error) {
         console.error(`${provider} OAuth 에러:`, error.message);
