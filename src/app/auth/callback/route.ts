@@ -21,18 +21,19 @@ export const GET = async (request: Request) => {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
 
       if (!error) {
-        // 로그인 성공 시 프로덕트 상세 페이지(/dream-teller)로 이동
+        // 로그인 성공 시 프로덕트 상세 페이지(/dream-teller) 또는 지정된 페이지로 이동
         const targetUrl = new URL(next, baseUrl).toString();
         return NextResponse.redirect(targetUrl);
       }
 
-      console.error('OAuth code exchange error:', error.message);
+      console.error('[Auth Callback] OAuth code exchange error:', error.message);
     } catch (err) {
-      console.error('Unexpected auth callback error:', err);
+      console.error('[Auth Callback] Unexpected auth callback error:', err);
     }
   }
 
   // 인증 실패 또는 코드 부재 시 에러 쿼리와 함께 /auth로 이동
-  const failUrl = new URL(`/auth?error=auth_callback_failed`, baseUrl).toString();
+  const failUrl = new URL('/auth?error=auth_callback_failed', baseUrl).toString();
   return NextResponse.redirect(failUrl);
 };
+
