@@ -14,6 +14,7 @@ interface MobileStickyBarProps {
   onNextStep: () => void;
   onSubmitOrder: () => void;
   isSubmitting?: boolean;
+  isGuestMode?: boolean;
 }
 
 /**
@@ -30,28 +31,40 @@ const MobileStickyBar = ({
   onNextStep,
   onSubmitOrder,
   isSubmitting = false,
+  isGuestMode = false,
 }: MobileStickyBarProps) => {
   const selectedPerspectiveData = PERSPECTIVES.find((p) => p.id === perspective);
   const isDreamValid = dreamContent.trim().length >= 20;
+  const maxSteps = isGuestMode ? 4 : 3;
 
   // 스텝별 CTA 버튼 활성화 및 액션 분기
   const canProceed =
     (currentStep === 1 && !!perspective) ||
     (currentStep === 2 && isDreamValid) ||
-    (currentStep === 3 && !!perspective && isDreamValid);
+    (currentStep === 3 && !!perspective && isDreamValid) ||
+    (currentStep === 4 && !!perspective && isDreamValid);
 
   const handleAction = () => {
     if (!canProceed) return;
-    if (currentStep === 3) {
-      onSubmitOrder();
+    if (isGuestMode) {
+      if (currentStep === 4) {
+        onSubmitOrder();
+      } else {
+        onNextStep();
+      }
     } else {
-      onNextStep();
+      if (currentStep === 3) {
+        onSubmitOrder();
+      } else {
+        onNextStep();
+      }
     }
   };
 
   const getButtonText = () => {
     if (currentStep === 1) return '꿈 작성하기';
     if (currentStep === 2) return '옵션 확인하기';
+    if (currentStep === 3 && isGuestMode) return '비회원 정보 입력';
     return `${totalAmount.toLocaleString()}원 결제하기`;
   };
 
@@ -61,7 +74,7 @@ const MobileStickyBar = ({
         {/* 요약 정보 */}
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5 text-xs text-[#7A7393]">
-            <span>{currentStep}/3단계</span>
+            <span>{currentStep}/{maxSteps}단계</span>
             {selectedPerspectiveData && (
               <>
                 <span>•</span>

@@ -270,6 +270,59 @@ const GuestCheckPage = () => {
             ))}
           </div>
         )}
+
+        {/* ================= 회원가입 및 소셜 로그인 전환 유도 섹션 ================= */}
+        <section className="mt-10 relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#2D1B4E] via-[#1E1B2E] to-[#120F24] border-2 border-amber-400/30 p-6 sm:p-8 text-white shadow-2xl shadow-purple-950/20">
+          {/* 오로라 배경 블러 */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="space-y-3 max-w-xl">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>회원 전용 혜택 안내</span>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-serif font-bold text-white tracking-tight leading-snug">
+                매번 비밀번호를 찾지 마세요.<br className="hidden sm:inline" />
+                <span className="text-amber-300">평생 보관되는 나만의 무의식 서재</span>를 얻으세요
+              </h2>
+
+              <p className="text-xs sm:text-sm text-purple-200/80 leading-relaxed">
+                카카오나 Google 계정으로 3초 만에 로그인하시면, 지금까지 비회원으로 의뢰한 꿈들을 
+                <strong> 월별 무의식 캘린더</strong>와 <strong>고화질 아트워크 갤러리</strong>에 영구 보존할 수 있습니다.
+              </p>
+
+              {/* 혜택 뱃지 그리드 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/10 text-purple-100">
+                  <span className="text-amber-400">📅</span>
+                  <span>꿈 캘린더 자동 기록</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/10 text-purple-100">
+                  <span className="text-amber-400">🎨</span>
+                  <span>고화질 아트워크 소장</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/10 text-purple-100">
+                  <span className="text-amber-400">⚡</span>
+                  <span>비번 없이 1초 열람</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 회원 로그인 페이지로 이동 버튼 */}
+            <div className="shrink-0 w-full md:w-auto">
+              <Link
+                href="/auth"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 text-[#1E1B2E] font-bold text-sm sm:text-base shadow-xl shadow-amber-950/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group"
+              >
+                <span>3초 소셜 회원가입/로그인하기</span>
+                <ArrowRight className="w-4 h-4 text-[#1E1B2E] group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+          </div>
+        </section>
       </main>
 
       <Footer />

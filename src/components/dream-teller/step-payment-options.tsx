@@ -13,6 +13,7 @@ import {
   Clock, 
   ShieldAlert, 
   ArrowLeft,
+  ArrowRight,
   CreditCard,
   Lock,
   Layers
@@ -26,6 +27,8 @@ interface StepPaymentOptionsProps {
   onPrev: () => void;
   onSubmitOrder: () => void;
   isSubmitting?: boolean;
+  isGuestMode?: boolean;
+  onNextToGuestInfo?: () => void;
 }
 
 /**
@@ -43,6 +46,8 @@ const StepPaymentOptions = ({
   onPrev,
   onSubmitOrder,
   isSubmitting = false,
+  isGuestMode = false,
+  onNextToGuestInfo,
 }: StepPaymentOptionsProps) => {
   const selectedPerspectiveData = PERSPECTIVES.find((p) => p.id === perspective);
   
@@ -271,23 +276,35 @@ const StepPaymentOptions = ({
           <span>이전: 꿈 내용 수정</span>
         </button>
 
-        <button
-          type="button"
-          onClick={onSubmitOrder}
-          disabled={isSubmitting || !perspective || dreamContent.trim().length < 20}
-          className={`inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-bold text-base transition-all duration-200 shadow-md w-full sm:w-auto cursor-pointer ${
-            isSubmitting
-              ? 'bg-stone-300 text-stone-500 cursor-wait'
-              : 'bg-[#1E1B2E] text-amber-200 hover:bg-[#2D2845] hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]'
-          }`}
-        >
-          <CreditCard className="w-5 h-5 text-amber-300" />
-          <span>
-            {isSubmitting
-              ? '결제 페이지 준비 중...'
-              : `${totalAmount.toLocaleString()}원 결제하고 해몽 의뢰하기 ✨`}
-          </span>
-        </button>
+        {isGuestMode ? (
+          <button
+            type="button"
+            onClick={onNextToGuestInfo || onSubmitOrder}
+            disabled={isSubmitting || !perspective || dreamContent.trim().length < 20}
+            className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-bold text-base transition-all duration-200 shadow-md w-full sm:w-auto cursor-pointer bg-gradient-to-r from-[#2D1B4E] to-[#1E1B2E] text-amber-300 hover:text-amber-200 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+          >
+            <span>다음: 비회원 주문 정보 입력 (4단계)</span>
+            <ArrowRight className="w-5 h-5 text-amber-300" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onSubmitOrder}
+            disabled={isSubmitting || !perspective || dreamContent.trim().length < 20}
+            className={`inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl font-bold text-base transition-all duration-200 shadow-md w-full sm:w-auto cursor-pointer ${
+              isSubmitting
+                ? 'bg-stone-300 text-stone-500 cursor-wait'
+                : 'bg-[#1E1B2E] text-amber-200 hover:bg-[#2D2845] hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]'
+            }`}
+          >
+            <CreditCard className="w-5 h-5 text-amber-300" />
+            <span>
+              {isSubmitting
+                ? '결제 페이지 준비 중...'
+                : `${totalAmount.toLocaleString()}원 결제하고 해몽 의뢰하기 ✨`}
+            </span>
+          </button>
+        )}
       </div>
     </div>
   );
