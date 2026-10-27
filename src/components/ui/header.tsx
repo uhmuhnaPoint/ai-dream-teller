@@ -25,6 +25,9 @@ const Header = () => {
 
       {/* 데스크톱 네비게이션 링크 */}
       <nav className="hidden md:flex items-center space-x-6 text-sm font-medium text-[#4B4562]">
+        <Link href="/feeds" className="hover:text-[#6B46C1] transition-colors">
+          꿈 피드
+        </Link>
         <Link href="/auth" className="hover:text-[#6B46C1] transition-colors">
           로그인
         </Link>
@@ -71,6 +74,9 @@ const Header = () => {
             <nav className="flex flex-col space-y-3 text-sm font-semibold text-[#1E1B2E]">
               <Link href="/" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
                 홈
+              </Link>
+              <Link href="/feeds" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
+                익명 꿈 피드 🌙
               </Link>
               <Link href="/dream-teller" className="py-2 text-[#6B46C1] font-bold" onClick={() => setIsOpen(false)}>
                 꿈 해몽 시작하기 ✨

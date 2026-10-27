@@ -311,19 +311,27 @@ const RecentDreams = () => {
           ))}
         </div>
 
-        {/* 더 많은 피드 로드하기 버튼 */}
-        {visibleCount < filteredDreams.length && (
-          <div className="mt-10 text-center">
+        {/* 더 많은 피드 로드하기 버튼 및 전체 피드 이동 */}
+        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
+          {visibleCount < filteredDreams.length && (
             <button
               type="button"
               onClick={() => setVisibleCount((prev) => prev + 3)}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white border border-[#E8E0F8] text-xs sm:text-sm font-semibold text-[#1E1B2E] hover:bg-[#FAF8F5] hover:border-[#6B46C1]/40 shadow-xs transition-all duration-200"
             >
-              <span>다른 유저의 꿈 피드 더 불러오기</span>
+              <span>꿈 카드 더 불러오기</span>
               <ArrowRight className="w-4 h-4 text-[#6B46C1]" />
             </button>
-          </div>
-        )}
+          )}
+
+          <Link
+            href="/feeds"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#FAF8F5] border border-[#6B46C1]/30 text-xs sm:text-sm font-semibold text-[#6B46C1] hover:bg-[#E8E0F8]/50 shadow-xs transition-all duration-200"
+          >
+            <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+            <span>밤의 비밀 서재 (피드 전체보기)</span>
+          </Link>
+        </div>
       </div>
 
       {/* ============================================================== */}
