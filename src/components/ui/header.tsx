@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Menu, X, Sparkles } from 'lucide-react';
 
@@ -10,6 +10,30 @@ import { Menu, X, Sparkles } from 'lucide-react';
  */
 const Header = () => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
+
+  // 모바일 Drawer 오픈 시 ESC 키 닫힘 및 배경 스크롤 잠금 관리
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const closeMenu = useCallback(() => {
+    setIsOpen(false);
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3.5 bg-[#FAF8F5]/90 backdrop-blur-md border-b border-[#E8E0F8]/80 transition-all">
@@ -58,36 +82,49 @@ const Header = () => {
 
       {/* 모바일 Drawer (위에서 아래로 풀 너비 슬라이드) */}
       {isOpen && (
-        <div className="fixed inset-0 bg-[#1E1B2E]/40 backdrop-blur-xs z-50 md:hidden flex flex-col justify-start">
-          <div className="bg-[#FAF8F5] border-b border-[#E8E0F8] p-6 shadow-xl flex flex-col gap-4 animate-in slide-in-from-top duration-200">
+        <div className="fixed inset-0 z-50 md:hidden">
+          {/* 어두운 배경 오버레이 (백드롭 터치/클릭 시 닫힘) */}
+          <div
+            className="fixed inset-0 bg-[#1E1B2E]/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+            onClick={closeMenu}
+            aria-hidden="true"
+          />
+
+          {/* 상단 Drawer 메뉴 컨텐츠 */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="모바일 네비게이션 메뉴"
+            className="relative bg-[#FAF8F5] border-b border-[#E8E0F8] p-6 shadow-xl flex flex-col gap-4 animate-in slide-in-from-top duration-200 z-10"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-[#E8E0F8]">
               <span className="font-bold text-[#1E1B2E]">메뉴</span>
               <button
                 type="button"
                 className="p-1.5 rounded-lg text-[#4B4562] hover:bg-[#E8E0F8]/50"
-                onClick={() => setIsOpen(false)}
+                onClick={closeMenu}
                 aria-label="메뉴 닫기"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <nav className="flex flex-col space-y-3 text-sm font-semibold text-[#1E1B2E]">
-              <Link href="/" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
+              <Link href="/" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
                 홈
               </Link>
-              <Link href="/feeds" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
+              <Link href="/feeds" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
                 익명 꿈 피드 🌙
               </Link>
-              <Link href="/dream-teller" className="py-2 text-[#6B46C1] font-bold" onClick={() => setIsOpen(false)}>
+              <Link href="/dream-teller" className="py-2 text-[#6B46C1] font-bold" onClick={closeMenu}>
                 꿈 해몽 시작하기 ✨
               </Link>
-              <Link href="/auth" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
+              <Link href="/auth" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
                 로그인
               </Link>
-              <Link href="/guest-login" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
+              <Link href="/guest-login" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
                 비회원 주문 조회
               </Link>
-              <Link href="/my-page" className="py-2 hover:text-[#6B46C1]" onClick={() => setIsOpen(false)}>
+              <Link href="/my-page" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
                 마이페이지
               </Link>
             </nav>
