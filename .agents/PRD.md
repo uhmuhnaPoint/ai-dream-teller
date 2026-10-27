@@ -139,8 +139,16 @@
    - **더미데이터 & 비주얼**: 4대 학파별 고증된 현실적 꿈 서사 풀 및 `faker.image.urlPicsumPhotos` 연동 AI 아트워크 (`next.config.ts` 원격 도메인 허용)
    - **필터링 & 무한 스크롤**: 4대 학파/아트워크 전용 필터 탭 및 `IntersectionObserver` 기반 자동 추가 로드 (Load More 버튼 병행)
 
-9. **회원 로그인 (`/auth`)**
-   - 구글·카카오 소셜 로그인, 성공 시 `/dream-teller` 이동
+9. **회원 로그인 (`/auth`)** (구현완료) [x]
+   - 구글·카카오 소셜 로그인, 성공 시 `/dream-teller` (프로덕트 상세 페이지) 자동 이동
+   - **공식 디자인 규격 준수**:
+     - 카카오 공식 로그인 버튼 (Background: `#FEE500`, Symbol: 카카오 말풍선 공식 SVG, Label: "카카오 로그인")
+     - Google 공식 로그인 버튼 (Background: White, Border: `#DADCE0`, Symbol: Google 4색 'G' 공식 SVG, Label: "Google 계정으로 로그인")
+   - **동적 도메인 분기 라우팅**:
+     - 개발 환경(`http://localhost:3000`) 및 프로덕트 환경(`https://ai-dream-teller-cyan.vercel.app`)을 브라우저/서버 환경별로 자동 감지하여 OAuth Callback URL 매핑
+   - **콜백 라우트 핸들러 (`/auth/callback`)**: Supabase Code 교환 및 세션 수립 후 `next` 파라미터 대상 경로로 303 Redirect
+   - **편의 기능**: 1초 체험 계정 빠른 입장 지원, 비회원 작성 바로가기, 개인정보 100% 비밀보장 뱃지
+
 
 10. **텔레그램 알림**
     - 결제·AI 해몽 완료 알림 (성공/실패)
