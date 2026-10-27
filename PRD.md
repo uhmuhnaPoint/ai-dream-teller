@@ -18,6 +18,7 @@
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS, Shadcn/ui
 - **Backend & DB**: Next.js API Routes, Supabase
+- **Auth & Session**: Supabase Auth (`@supabase/ssr`, `@supabase/supabase-js` 기반 쿠키 세션, Google·Kakao 공식 디자인 규격 소셜 로그인 및 개발/프로덕트 동적 도메인 자동 라우팅)
 - **Payments**: Toss payments (최신 v2 `@tosspayments/tosspayments-sdk` 주문서형 결제위젯)
 - **Data Mocking**: `@faker-js/faker` (`urlPicsumPhotos` 기반 고화질 꿈 시각화 연동)
 - **AI**: Gemini with gemini sdk
@@ -178,8 +179,8 @@
 
 - `POST /api/auth/login`
   - 설명: 소셜 로그인(Google, Kakao) 인증을 위해 Supabase Auth 인스턴스를 통해 각 제공업체의 권한 승인 페이지로 리다이렉트합니다.
-- `GET /api/auth/callback`
-  - 설명: 소셜 로그인 최종 승인 후 전달된 인증 코드를 확인하여 세션을 확정하고, 성공 시 지정된 페이지(`/dream-teller`)로 리다이렉트합니다.
+- `GET /auth/callback` (구현완료) [x]
+  - 설명: 소셜 로그인 최종 승인 후 Supabase에서 반환된 인증 코드(`code`)를 세션으로 교환하고, 개발(localhost) 및 프로덕션(Vercel) 환경에 맞는 도메인을 자동 감지하여 지정된 목적지(`/dream-teller` 등)로 303 리다이렉트합니다.
 - `POST /api/auth/logout`
   - 설명: 현재 활성화된 사용자의 세션을 종료하고 로그아웃 처리합니다.
 - `POST /api/auth/guest`
