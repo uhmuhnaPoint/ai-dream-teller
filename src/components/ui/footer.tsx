@@ -58,7 +58,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="mailto:support@aidreamteller.com" className="hover:text-[#6B46C1] transition-colors">
+                <Link href="/contact" className="hover:text-[#6B46C1] transition-colors">
                   고객 문의하기
                 </Link>
               </li>
