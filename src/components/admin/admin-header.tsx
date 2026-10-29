@@ -106,12 +106,12 @@ export const AdminHeader = ({ onOpenSidebar }: AdminHeaderProps) => {
 
         {/* 우측: 퀵 상태 칩 & 액션 컨트롤러 */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* 오늘 매출 현황 칩 (수익형 서비스 핵심) */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-semibold shadow-xs">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-            <span>오늘 매출</span>
-            <span className="font-bold text-emerald-950">38,500원</span>
+          {/* 실시간 백엔드 연결 배지 */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 border border-purple-200/60 text-purple-800 text-xs font-semibold shadow-xs">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Supabase 실시간 연동</span>
           </div>
+
 
           {/* 새로고침 버튼 */}
           <button
