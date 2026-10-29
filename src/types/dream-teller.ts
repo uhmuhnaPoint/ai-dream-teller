@@ -29,5 +29,13 @@ export interface OrderDraftData {
   dreamContent: string;
   includeImage: boolean;
   totalAmount: number;
+  orderId?: string;
+  orderNumber?: string;
+  isGuest?: boolean;
+  guestInfo?: {
+    phone: string;
+    password: string;
+  };
   createdAt: string;
 }
+

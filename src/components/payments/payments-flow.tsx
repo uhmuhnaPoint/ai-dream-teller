@@ -7,6 +7,7 @@ import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk';
 import { getTossClientKey } from '@/lib/tosspayments';
 import { OrderDraftData, PerspectiveType } from '@/types/dream-teller';
 import { PERSPECTIVES } from '@/components/dream-teller/step-perspective';
+import { useAuth } from '@/providers/auth-provider';
 import { 
   ShieldCheck, 
   Sparkles, 
@@ -23,21 +24,35 @@ const STORAGE_KEY = 'ai_dream_order_draft';
 /**
  * PaymentsFlow: 결제 페이지(/payments)의 토스페이먼츠 위젯 렌더링 및 결제 요청 플로우 컴포넌트입니다.
  * PRD 요구사항 준수:
- * - 회원/비회원 결제 모두 지원 (customerKey: ANONYMOUS)
+ * - 회원/비회원 결제 모두 지원 (회원은 user.id를 customerKey로 활용하여 결제수단 저장 지원)
  * - React 18/19 Strict Mode에서의 위젯 중복 마운트 방지 및 클린업 로직 적용
- * - 결제 실패 시에도 sessionStorage의 꿈 내용 유지
+ * - DB 사전 생성된 order_number를 토스 orderId로 연결하여 금액 위변조 및 무결성 보장
  */
 const PaymentsFlow = () => {
   const router = useRouter();
+  const { user: authUser, isLoggedIn } = useAuth();
 
   // 주문 초안 데이터
   const [orderDraft, setOrderDraft] = useState<OrderDraftData | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState<boolean>(true);
 
-  // 구매자 정보 (비회원/회원 겸용)
+  // 구매자 정보 (비회원/회원 겸용 - 회원의 경우 프로필 정보 자동 연동)
   const [customerName, setCustomerName] = useState<string>('');
   const [customerEmail, setCustomerEmail] = useState<string>('');
   const [customerPhone, setCustomerPhone] = useState<string>('');
+
+  // 회원 로그인 시 구매자 정보 자동 입력
+  useEffect(() => {
+    if (authUser) {
+      const meta = authUser.user_metadata;
+      const name =
+        (typeof meta?.name === 'string' && meta.name) ||
+        (typeof meta?.full_name === 'string' && meta.full_name) ||
+        '';
+      if (name && !customerName) setCustomerName(name);
+      if (authUser.email && !customerEmail) setCustomerEmail(authUser.email);
+    }
+  }, [authUser]);
 
   // 위젯 로딩 및 결제 진행 상태
   const [isWidgetLoading, setIsWidgetLoading] = useState<boolean>(true);
@@ -82,8 +97,9 @@ const PaymentsFlow = () => {
 
         if (!isMounted) return;
 
-        // 비회원 결제 지원 (ANONYMOUS 키 사용)
-        const widgets = tossPayments.widgets({ customerKey: ANONYMOUS });
+        // 회원인 경우 authUser.id를 customerKey로 활용하여 결제수단 저장 지원, 비회원은 ANONYMOUS
+        const customerKey = authUser?.id || ANONYMOUS;
+        const widgets = tossPayments.widgets({ customerKey });
         widgetsRef.current = widgets;
 
         // 결제 금액 설정
@@ -126,7 +142,7 @@ const PaymentsFlow = () => {
       // React Strict Mode 언마운트 시 상태 초기화
       isInitializedRef.current = false;
     };
-  }, [orderDraft]);
+  }, [orderDraft, authUser]);
 
   // 3. 결제 요청 핸들러
   const handlePayment = async () => {
@@ -139,12 +155,35 @@ const PaymentsFlow = () => {
       const perspectiveName = selectedPerspective ? selectedPerspective.name.split(' ')[0] : '심층분석';
       const orderName = `AI 꿈 해몽 (${perspectiveName}${orderDraft.includeImage ? ' + 아트워크' : ''})`;
 
-      // 고유 주문번호 생성 (6~64자)
-      const orderId = `DREAM_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      let targetOrderNumber = orderDraft.orderNumber;
 
-      // 결제창 호출
+      // DB에 사전 생성된 주문서가 없는 경우(직접 URL 접근 등) POST /api/orders 호출하여 pending 주문서 확보
+      if (!targetOrderNumber) {
+        const orderResponse = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dreamContent: orderDraft.dreamContent,
+            expertField: orderDraft.perspective,
+            includesImage: orderDraft.includeImage,
+            totalAmount: orderDraft.totalAmount,
+          }),
+        });
+
+        const orderResult = await orderResponse.json();
+        if (!orderResponse.ok || !orderResult.success) {
+          throw new Error(orderResult.message || '주문서 생성에 실패했습니다.');
+        }
+
+        targetOrderNumber = orderResult.data.orderNumber;
+        setOrderDraft((prev) =>
+          prev ? { ...prev, orderNumber: targetOrderNumber, orderId: orderResult.data.orderId } : null
+        );
+      }
+
+      // 결제창 호출 (토스 orderId에 DB의 고유 order_number 바인딩)
       await widgetsRef.current.requestPayment({
-        orderId,
+        orderId: targetOrderNumber,
         orderName,
         successUrl: `${window.location.origin}/payments/success`,
         failUrl: `${window.location.origin}/payments/fail`,
@@ -153,9 +192,13 @@ const PaymentsFlow = () => {
         customerMobilePhone: customerPhone.trim() ? customerPhone.replace(/[^0-9]/g, '') : undefined,
       });
     } catch (err) {
-      // 사용자가 결제창을 닫거나 취소한 경우
+      // 사용자가 결제창을 닫거나 취소한 경우 또는 주문서 생성 실패 시
       setIsProcessing(false);
-      console.warn('결제 요청 중단 또는 오류:', err);
+      const msg = err instanceof Error ? err.message : '결제 요청 중 오류가 발생했습니다.';
+      console.warn('결제 요청 중단 또는 오류:', msg);
+      if (err instanceof Error && !msg.includes('사용자가 결제를 취소')) {
+        alert(msg);
+      }
     }
   };
 

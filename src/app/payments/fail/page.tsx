@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -10,6 +10,17 @@ const PaymentFailContent = () => {
   const code = searchParams.get('code') || 'PAYMENT_CANCELLED';
   const message = searchParams.get('message') || '결제가 취소되었거나 승인되지 않았습니다.';
   const orderId = searchParams.get('orderId');
+
+  // 마운트 시 서버에 결제 실패 내역 자동 기록
+  useEffect(() => {
+    if (orderId) {
+      fetch('/api/payments/fail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, code, message }),
+      }).catch((err) => console.error('결제 실패 사유 서버 기록 실패:', err));
+    }
+  }, [orderId, code, message]);
 
   return (
     <div className="max-w-md mx-auto my-8 bg-white border-2 border-[#E8E0F8] rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-md">

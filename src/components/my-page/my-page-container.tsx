@@ -59,6 +59,59 @@ export const MyPageContainer = () => {
     }
   }, [authUser]);
 
+  // 실제 로그인 회원의 주문 내역(GET /api/orders) 조회 및 동기화
+  useEffect(() => {
+    if (authUser && authUser.id !== 'demo-scholar-user-01') {
+      const fetchOrders = async () => {
+        try {
+          const res = await fetch('/api/orders');
+          const result = await res.json();
+          if (res.ok && result.success && Array.isArray(result.data)) {
+            interface OrderApiItem {
+              id: string;
+              order_number: string;
+              created_at: string;
+              dream_content: string;
+              expert_field: string;
+              includes_image: boolean;
+              total_amount: number;
+              payment_status: string;
+            }
+            const mappedOrders: DreamPurchaseOrder[] = result.data.map((item: OrderApiItem) => {
+              const perspectiveMap: Record<string, string> = {
+                freud: '프로이트 정신분석',
+                jung: '융 분석심리학',
+                neuroscience: '현대 뇌과학',
+                gestalt: '게슈탈트',
+              };
+              return {
+                orderId: item.order_number || item.id,
+                date: item.created_at ? item.created_at.split('T')[0] : '2026.10.29',
+                dreamTitle:
+                  item.dream_content && item.dream_content.length > 28
+                    ? `${item.dream_content.slice(0, 28)}...`
+                    : item.dream_content || '심층 무의식 분석',
+                perspectiveName: perspectiveMap[item.expert_field] || '융 분석심리학',
+                hasArtwork: Boolean(item.includes_image),
+                price: item.total_amount,
+                resultUrl: `/dream-result/${item.order_number || item.id}`,
+                status: item.payment_status === 'paid' ? 'completed' : 'processing',
+              };
+            });
+
+            if (mappedOrders.length > 0) {
+              setOrders(mappedOrders);
+            }
+          }
+        } catch (err) {
+          console.error('구매 내역 조회 중 오류:', err);
+        }
+      };
+
+      fetchOrders();
+    }
+  }, [authUser]);
+
   // 1초 체험 모드 활성화 핸들러
   const handleEnableDemoMode = () => {
     if (typeof window !== 'undefined') {

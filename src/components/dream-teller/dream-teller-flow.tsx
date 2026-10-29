@@ -22,6 +22,7 @@ import {
   UserX,
   Phone
 } from 'lucide-react';
+import { useAuth } from '@/providers/auth-provider';
 
 const STORAGE_KEY = 'ai_dream_order_draft';
 
@@ -35,14 +36,19 @@ const STORAGE_KEY = 'ai_dream_order_draft';
  */
 const DreamTellerFlow = () => {
   const router = useRouter();
+  const { isLoggedIn, user: authUser } = useAuth();
 
   // 스텝 관리 (1: 학파 선택, 2: 꿈 작성, 3: 옵션 확인, 4: 비회원 정보 입력)
   const [activeStep, setActiveStep] = useState<number>(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
-  // 회원 vs 비회원 모드 (Dev Tools 시뮬레이터 및 자동 감지 지원)
-  // 비회원 섹션의 프론트엔드 검증 편의를 위해 기본값 true(비회원 주문 모드)로 설정하거나 세션 감지
-  const [isGuestMode, setIsGuestMode] = useState<boolean>(true);
+  // 회원 vs 비회원 모드 (로그인 세션 기반 기본값 설정)
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(!isLoggedIn);
+
+  // 로그인 상태 변화 시 게스트 모드 자동 동기화
+  useEffect(() => {
+    setIsGuestMode(!isLoggedIn);
+  }, [isLoggedIn]);
 
   // 폼 상태 (PRD 요구사항: 이미지 추가 기본 활성화 true)
   const [perspective, setPerspective] = useState<PerspectiveType | null>('jung');
@@ -171,11 +177,38 @@ const DreamTellerFlow = () => {
     try {
       setIsSubmitting(true);
 
+      let registeredOrderId: string | undefined;
+      let registeredOrderNumber: string | undefined;
+
+      // 소셜 로그인 회원의 경우 서버 DB에 pending 주문서 사전 생성
+      if (!isGuestMode && isLoggedIn) {
+        const orderResponse = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dreamContent: dreamContent.trim(),
+            expertField: perspective,
+            includesImage: includeImage,
+            totalAmount,
+          }),
+        });
+
+        const orderResult = await orderResponse.json();
+        if (!orderResponse.ok || !orderResult.success) {
+          throw new Error(orderResult.message || '주문서 생성에 실패했습니다.');
+        }
+
+        registeredOrderId = orderResult.data?.orderId;
+        registeredOrderNumber = orderResult.data?.orderNumber;
+      }
+
       const orderDraft = {
         perspective,
         dreamContent: dreamContent.trim(),
         includeImage,
         totalAmount,
+        orderId: registeredOrderId,
+        orderNumber: registeredOrderNumber,
         isGuest: isGuestMode,
         guestInfo: isGuestMode
           ? {
@@ -191,8 +224,9 @@ const DreamTellerFlow = () => {
 
       // 결제 페이지로 이동
       router.push('/payments');
-    } catch {
-      alert('결제 페이지로 이동하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '결제 페이지로 이동하는 중 오류가 발생했습니다.';
+      alert(message);
       setIsSubmitting(false);
     }
   };

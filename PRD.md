@@ -216,31 +216,78 @@
 
 ### 6.3 주문 및 결제 (Orders & Payments)
 
-- `GET /api/orders`
-  - 설명: 현재 로그인한 사용자의 구매 이력 리스트를 반환합니다. (마이페이지 용도)
 - `POST /api/orders`
-  - 설명: 꿈 입력 데이터와 선택된 옵션, 전문 분야 등을 기반으로 주문서(Pending Order)를 생성합니다.
-  - **비회원 처리**: 비회원 주문 시 `phone_number`와 `guest_password`를 전달받아 `users` 테이블에 guest 레코드를 생성하거나 기존 정보를 연동합니다.
-  - **금액 검증**: 클라이언트에서 전달된 `total_amount`가 서버의 옵션 가격 정책과 일치하는지 반드시 검증하여 위변조를 차단합니다.
+  - **설명**: 꿈 입력 데이터, 선택 옵션, 전문 학파를 바탕으로 토스 결제창 호출 직전 결제 대기 주문서(`status='pending'`)를 DB에 사전 생성합니다.
+  - **요청 Body**: `{ dreamContent, expertField, includesImage, totalAmount, guestInfo?: { phone, password } }`
+  - **금액 무결성 검증 (Tampering 방어)**:
+    - 기본 텍스트 해몽: 1,500원
+    - AI 이미지 생성 옵션 포함: 2,000원
+    - 클라이언트에서 전송한 `totalAmount`가 서버의 단가 정책과 1원이라도 불일치할 경우 400 Bad Request 에러 반환 및 주문 생성 즉시 차단.
+  - **주문 식별자 규격**: 토스페이먼츠 v2 위젯 규격(6~64자 영문/숫자/-/_ 허용)을 준수하는 고유 `order_id` 발급 (예: `DREAM_${timestamp}_${randomHex}` 또는 표준 UUID).
+  - **회원/비회원 분기 및 비밀번호 암호화**:
+    - **회원**: 세션 쿠키에서 `user.id` 추출하여 `orders.user_id`에 바인딩.
+    - **비회원**: `guestInfo`의 `phone`(숫자만 정제) 및 `password`를 수신하여, `users` 테이블에 게스트 계정을 upsert 생성하고 비밀번호는 단방향 솔트 해시(`guest_password_hash`)로 암호화하여 저장(평문 저장 절대 금지). 이후 발급된 guest의 `id`를 `orders.user_id`에 바인딩.
+  - **응답**: `{ success: true, data: { orderId, totalAmount, orderName } }`
+
+- `GET /api/orders`
+  - **설명**: 현재 로그인한 활성 회원의 전체 구매 이력 리스트를 반환합니다. (마이페이지 `/my-page` 용도)
+  - **보안/인가**: Supabase Auth 세션 검증 필수 (미인증 시 401 Unauthorized).
+  - **응답 데이터**: `orders` 목록 최신순 정렬 및 각 주문에 매핑된 `dream_results.analysis_status` 포함.
+
 - `GET /api/orders/[id]`
-  - 설명: 개별 주문에 대한 구매 정보 및 (생성 완료된) 꿈 해몽 결과를 반환합니다.
-  - **권한 검증**: 요청자의 세션(회원/비회원)이 해당 주문의 소유주인지 확인하는 로직을 포함합니다.
+  - **설명**: 특정 주문의 상세 구매 정보와 생성 완료된 AI 꿈 해몽 결과를 1:1 조인하여 반환합니다.
+  - **소유권 인가 검증 (IDOR 방어)**:
+    - **회원**: 세션 `user.id`와 주문의 `orders.user_id`가 일치하는지 검증.
+    - **비회원**: HttpOnly `dream_teller_guest_token` 쿠키를 복호화/대조하여 주문의 소유주와 일치하는지 검증.
+    - 타인의 주문이거나 미인가 요청인 경우 403 Forbidden 또는 404 Not Found를 반환하여 타인의 꿈 본문 및 결과 열람을 원천 차단.
+  - **응답 데이터**: 주문 정보(`orders`) + 해몽 결과(`dream_results`: 4대학파 분석, 상징, 심리 처방, 이미지 URL, `is_public`).
+
 - `GET /api/orders/guest`
-  - 설명: 발급받은 비회원 세션을 인증하여 해당 비회원의 주문 내역 리스트를 반환합니다.
+  - **설명**: 비회원 세션 쿠키를 인증하여 해당 비회원의 주문 내역 리스트를 반환합니다. (비회원 조회 `/guest-check` 용도)
+  - **보안/인가**: HttpOnly `dream_teller_guest_token` 쿠키 검증 (미인증 시 401 Unauthorized).
+  - **데이터 격리**: 인증된 게스트 유저의 `phone_number`로 체결된 주문만 필터링하여 타 비회원 주문과 완벽 격리 반환.
+
 - `POST /api/payments/confirm` (구현완료) [x]
-  - 설명: 토스페이먼츠 결제 승인 API를 호출하여 최종 결제 완료 처리를 수행합니다.
-  - **승인 처리**: 클라이언트로부터 `paymentKey`, `orderId`, `amount`를 전달받아 `TOSS_SECRET_KEY` 기반 Basic Auth로 토스페이먼츠 승인 엔드포인트(`https://api.tosspayments.com/v1/payments/confirm`)를 호출합니다.
-  - **후속 처리**: 결제 성공 시 주문 상태를 `paid`로 변경하고, **텔레그램 알림 발송 (상품, 유저아이디, 결제금액, 꿈내용 일부)**을 진행합니다. 직후 AI 해몽 생성 API(`api/ai/generate`)를 비동기 호출합니다.
+  - **설명**: 토스페이먼츠 결제 승인 API를 호출하여 최종 결제 완료 처리를 수행하고 후속 AI 파이프라인을 트리거합니다.
+  - **요청 Body**: `{ paymentKey, orderId, amount }`
+  - **1단계: 결제 무결성 사전 검증**:
+    - DB `orders` 테이블에서 `orderId` 조회. 존재하지 않을 시 404 Not Found.
+    - DB에 기록된 `total_amount`와 클라이언트가 승인 요청한 `amount`를 대조하여 1원이라도 불일치 시 토스 API 호출 차단 및 400 Bad Request.
+  - **2단계: 동시성 제어 및 멱등성 보장 (Replay Attack 방어)**:
+    - 이미 `payment_status = 'paid'`인 주문에 대해 중복 요청 시, 추가 토스 승인 호출 없이 기존 결제 성공 응답을 즉각 반환하여 이중 승인/과금 원천 차단.
+  - **3단계: 토스페이먼츠 v1 승인 엔드포인트 호출**:
+    - `https://api.tosspayments.com/v1/payments/confirm` 엔드포인트를 `TOSS_SECRET_KEY` 기반 Basic Auth로 호출.
+  - **4단계: DB 원자적 상태 갱신**:
+    - `orders.payment_status` = `'paid'`, `orders.payment_key` = `paymentKey`, `orders.approved_at` = 현재시각 업데이트.
+    - `dream_results` 테이블에 초기 레코드(`order_id`, `analysis_status: 'processing'`) 생성.
+  - **5단계: 후속 비동기 파이프라인 트리거 (Non-blocking)**:
+    - **텔레그램 알림 발송**: 결제 완료 내역(상품명, 유저식별자, 결제금액, 꿈 내용 일부) 관리자 봇 전송.
+    - **AI 해몽 생성 비동기 호출**: `POST /api/ai/generate`를 비동기 호출하여 즉각적인 분석 가동 (AI 실패 시에도 결제 승인 자체는 보존).
+
 - `POST /api/payments/fail`
-  - 설명: 결제 과정에서 발생한 실패 정보를 기록하고 해당 주문서의 상태를 `failed`로 업데이트합니다.
-  - **후속 처리**: 실패 내역(에러 메시지 등)을 포함하여 관리자에게 **텔레그램 실패 알림 발송**을 진행합니다.
+  - **설명**: 카드사 한도 초과, 잔액 부족, 사용자 결제 취소 등으로 결제 승인 실패 시 실패 사유를 DB에 기록합니다.
+  - **요청 Body**: `{ orderId, code, message }`
+  - **동작**:
+    - `orders` 테이블의 해당 주문에 대해 `payment_status` = `'failed'`, `error_message` = `message` 기록.
+    - 관리자 텔레그램으로 결제 실패 알림 발송 (에러 코드, 실패 사유, 주문번호).
+  - **클라이언트 연동**: `/payments/fail` 페이지 진입 시 해당 엔드포인트를 자동 호출하여 실패 이력 누락 방지.
+
 - `POST /api/payments/cancel`
-  - 설명: 결제 취소 및 환불 요청을 처리합니다. (AI 생성 전 단계 혹은 시스템 장애 시 사용)
+  - **설명**: 결제 승인 완료 건에 대한 취소 및 환불을 처리합니다. (관리자 A/S 또는 AI 생성 30초 초과 타임아웃 장애 복구 시 자동 가동)
+  - **요청 Body**: `{ orderId, paymentKey, cancelReason }`
+  - **보안/인가**: 관리자(`role: admin`) 권한 검증 또는 서버 내부 시스템 호출 검증.
+  - **동작**:
+    - 토스페이먼츠 취소 API(`https://api.tosspayments.com/v1/payments/{paymentKey}/cancel`) 호출.
+    - 성공 시 `orders.payment_status` = `'canceled'`로 갱신하고, 관리자 텔레그램 취소 알림 발송.
+
 - `POST /api/payments/webhook`
-  - 설명: 토스페이먼츠로부터 결제 상태 변경 알림(가상계좌 입금 완료 등)을 수신하여 처리합니다.
+  - **설명**: 토스페이먼츠로부터 결제 상태 변경(가상계좌 입금 완료, 승인 취소 등) 비동기 알림을 수신하여 서버 상태를 동기화합니다.
+  - **보안 검증**: 토스페이먼츠 웹훅 시크릿 헤더/서명 검증을 거쳐 비인가 페이로드 차단.
+  - **멱등 처리**: 이벤트 고유 ID 기반으로 동일 웹훅 중복 수신 시 1회만 트랜잭션 반영.
+
 - `POST /actions/dream-result (toggleDreamPublicAction)`
-  - 설명: 생성된 개별 꿈 결과의 피드 공개 여부를 전환하는 Next.js Server Action
-  - **보안 처리**: 비회원의 경우 JWT 토큰(`auth.getUser()`)이 없으므로, HttpOnly 쿠키의 `guest_session` 값을 추출한 뒤 Service Role 클라이언트를 활용해 DB 내부의 소유권을 매칭 및 대조하여 타인의 결과물을 변조할 수 없도록 강제 격리 검증을 수반함.
+  - **설명**: 생성된 개별 꿈 결과의 피드 공개 여부를 전환하는 Next.js Server Action
+  - **보안 처리**: 비회원의 경우 JWT 토큰(`auth.getUser()`)이 없으므로, HttpOnly 쿠키의 `dream_teller_guest_token` 값을 추출한 뒤 Service Role 클라이언트를 활용해 DB 내부의 소유권을 매칭 및 대조하여 타인의 결과물을 변조할 수 없도록 강제 격리 검증을 수반함.
 
 ### 6.4 피드 (Feeds)
 
@@ -400,30 +447,39 @@ Supabase PostgreSQL 환경을 기준으로 구성하되, 인증 테이블(`auth.
 
 Next.js Route Handlers(API Routes), Server Actions, 토스페이먼츠 결제 승인, Gemini AI 심층 해몽 생성 파이프라인, 비회원 데이터 격리 및 관리자 권한 통제의 무결성을 보장하기 위한 종단간(E2E) 백엔드 테스트 시나리오 목록입니다.
 
-| 테스트 ID | 대상 API / 기능 | 테스트 시나리오 및 극단적 케이스 | 요청 및 입력값 | 기대 동작 및 검증 기준 | 완료 여부 | 특이사항 (Remarks) |
+> **💡 백엔드 도메인/기능 단위 묶음 (Test Suites)**
+> 1. **인증 및 세션 (`BE-E2E-001` ~ `BE-E2E-004`)**: 미지원 OAuth 방어, 콜백 라우팅, 비회원 게스트 세션 발급, 세션/쿠키 무효화
+> 2. **회원 프로필 (`BE-E2E-005` ~ `BE-E2E-006`)**: 미인증 프로필 차단, 닉네임 유효성/XSS 방어
+> 3. **주문 및 비회원 격리 (`BE-E2E-007` ~ `BE-E2E-010`)**: 단가 위변조 차단, 게스트 비밀번호 단방향 해시, IDOR 소유권 검증, 비회원 데이터 격리
+> 4. **토스 결제 파이프라인 (`BE-E2E-011` ~ `BE-E2E-016`)**: 승인 금액 검증, 중복 승인 멱등성, 알림/트리거, 결제 실패 기록, 취소/환불, 웹훅 서명 검증
+> 5. **AI 심층 해몽 엔진 (`BE-E2E-017` ~ `BE-E2E-020`)**: 미결제 호출 원천 차단, 4대학파 리포트 생성, 이미지 생성/Storage 업로드, API 타임아웃 회복
+> 6. **피드 및 공유 통제 (`BE-E2E-021` ~ `BE-E2E-022`)**: 비공개 꿈 격리, 피드 공개 토글 권한 검증
+> 7. **관리자 운영 및 A/S (`BE-E2E-023` ~ `BE-E2E-025`)**: 통계 지표 RBAC, 1:1 조인 주문 목록, 관리자 AI 해몽 수동 재발행
+
+| 테스트 ID | 대상 기능 / API | 테스트 시나리오 및 극단적 케이스 | 요청 및 입력값 | 기대 동작 및 검증 기준 | 완료 여부 | 특이사항 (Remarks) |
 | :--- | :--- | :--- | :--- | :--- | :---: | :--- |
-| **BE-E2E-001** | `POST /api/auth/login` | 지원하지 않는 소셜 프로바이더 요청 방어 | Body: `{ "provider": "unsupported_provider" }` | 400 Bad Request 및 "지원하지 않는 소셜 로그인 제공자입니다" 반환 | [x] 완료 | Google, Kakao 외 비인가 OAuth 요청 차단 검증 완료 |
-| **BE-E2E-002** | `GET /auth/callback` | OAuth 코드 부재 또는 유효하지 않은 코드 수신 | 쿼리스트링에 `code` 누락 또는 변조된 임의 토큰 전달 | 500 에러 대신 `/auth?error=auth_callback_failed`로 안전 303 리다이렉트 | [x] 완료 | 프록시 `x-forwarded-host` 헤더 기반 프로덕션 도메인 산출 및 안전 폴백 라우팅 검증 완료 |
-| **BE-E2E-003** | `POST /api/auth/guest` | 비회원 휴대폰 번호/비밀번호 형식 극단값 및 인증 성공 | 전화번호 10자리 미만 / 비밀번호 4자리 미만 / 정상 게스트 정보 | 형식 미달 시 400 에러 차단, 정상 시 `dream_teller_guest_token` 쿠키 발급 및 게스트 프로필 반환 | [x] 완료 | 전화번호 하이픈 자동 포맷팅 및 쿠키 발급 정상 검증 완료 |
-| **BE-E2E-004** | `POST /api/auth/logout` | 활성 회원/비회원 세션 종료 및 쿠키 무효화 | POST 요청 호출 (쿠키 포함 상태) | Supabase 세션 signOut 수행, `dream_teller_guest_token` 쿠키 삭제 및 200 반환 | [x] 완료 | 회원 및 비회원 잔여 쿠키 동시 무효화 확인 완료 |
-| **BE-E2E-005** | `GET /api/users/me` | 미인증 사용자의 내 프로필 조회 차단 | Authorization 헤더 및 세션 쿠키 없는 비인가 GET 요청 | 401 Unauthorized 에러 반환 및 사용자 개인정보 노출 차단 | [ ] 미완료 | Auth 미들웨어 및 세션 가드 적용 검증 필요 |
-| **BE-E2E-006** | `PATCH /api/users/me` | 닉네임 수정 시 공백/초장문/특수문자 입력 차단 | Body: `{ "nickname": "   " }` 또는 30자 초과 문자열 | 400 Bad Request 반환, 정상 닉네임(1~15자) 제출 시 `users.nickname` DB 업데이트 반영 | [ ] 미완료 | 인라인 유효성 검증 및 XSS 살균(Sanitization) 검증 필요 |
-| **BE-E2E-007** | `POST /api/orders` | 결제 금액 위변조(Tampering) 악의적 조작 차단 | 2,000원 상품(해몽+이미지)에 대해 `total_amount: 100` 변조 전송 | 서버 옵션 단가 정책과 대조하여 불일치 감지, 400 에러 및 주문서 생성 차단 | [ ] 미완료 | 클라이언트 전송 금액 불신 및 서버 단가 재계산 검증 |
-| **BE-E2E-008** | `POST /api/orders` | 비회원 주문서 생성 시 비밀번호 단방향 암호화 | 비회원 전화번호 및 평문 비밀번호("1234") 전달 | `users` 테이블에 게스트 생성, 비밀번호는 `guest_password_hash`(단방향 해시)로 저장, 평문 저장 절대 차단 | [ ] 미완료 | 개인정보보호법 및 비밀번호 암호화 저장 검증 |
-| **BE-E2E-009** | `GET /api/orders/[id]` | 타인의 주문 상세 IDOR(직접 객체 참조) 접근 차단 | A 사용자의 세션으로 B 사용자의 `order_id` UUID 조회 | 403 Forbidden 또는 404 Not Found 반환으로 타인의 꿈 본문 및 결과 열람 차단 | [ ] 미완료 | RLS 정책 또는 세션 user_id 소유권 일치 검증 |
-| **BE-E2E-010** | `GET /api/orders/guest` | 비회원 게스트 토큰 위변조 및 주문 격리 | 임의 생성한 비회원 토큰 전달 / 정상 발급 토큰 전달 | 변조 토큰 401 차단, 정상 토큰 시 해당 전화번호로 생성된 주문 목록만 격리 반환 | [ ] 미완료 | 타 비회원 주문과의 완벽한 데이터 격리 검증 |
-| **BE-E2E-011** | `POST /api/payments/confirm` | 토스 승인 요청 금액과 주문서 금액 불일치 거절 | `orders.total_amount`는 2,000원인데 클라이언트가 `amount: 1500`으로 승인 요청 | 토스 승인 API 호출 전 금액 대조 불일치로 승인 즉시 중단 및 400 반환 | [x] 완료 | 결제 무결성 사전 차단 로직 검증 완료 |
-| **BE-E2E-012** | `POST /api/payments/confirm` | 동일 주문번호 연속 재승인 시도 (동시성/Replay Attack) | 승인 완료(`paid`)된 주문에 대해 1초 내 중복 승인 요청 전송 | 멱등성(Idempotency) 보장으로 중복 토스 호출 차단, 기존 결제 완료 응답 안전 반환 | [x] 완료 | 중복 승인으로 인한 이중 과금 원천 방지 검증 완료 |
-| **BE-E2E-013** | `POST /api/payments/confirm` | 결제 승인 완료 및 텔레그램 알림·AI 파이프라인 트리거 | 유효한 paymentKey, orderId, amount 전달 | 토스 승인 성공 후 status='paid', approved_at 기록, 텔레그램 알림 발송 및 AI 생성 비동기 호출 | [x] 완료 | 토스페이먼츠 v2 주문서 승인 연동 완료 |
-| **BE-E2E-014** | `POST /api/payments/fail` | 결제 실패 사유 저장 및 관리자 실패 알림 | 잔액 부족, 한도 초과, 사용자 취소 코드 전달 | `orders.payment_status` = 'failed' 및 `error_message` 기록, 관리자 텔레그램 에러 보고 | [ ] 미완료 | 결제 실패 이력 추적 및 복구 안내 플로우 검증 |
-| **BE-E2E-015** | `POST /api/payments/cancel` | 결제 승인 후 취소/환불 요청 | 기결제된 `payment_key` 및 취소 사유 전달 | 토스 결제 취소 API 호출, `payment_status` = 'canceled' 변경 및 DB 갱신 | [ ] 미완료 | AI 생성 착수 전/시스템 오류 시 환불 처리 검증 |
-| **BE-E2E-016** | `POST /api/payments/webhook` | 토스페이먼츠 웹훅 위변조 방지 및 상태 동기화 | 변조된 서명(Signature) 전달 / 정상 웹훅 페이로드 수신 | 변조 요청 401 거절, 정상 웹훅 수신 시 주문 상태(`paid`/`canceled`) 비동기 자동 동기화 | [ ] 미완료 | 웹훅 시크릿 서명 검증 및 비동기 트랜잭션 안전성 |
-| **BE-E2E-017** | `POST /api/ai/generate` | 미결제(`pending`/`failed`) 주문의 AI 분석 요청 차단 | 미결제 상태의 `order_id`로 AI 생성 엔드포인트 직접 호출 | 400/403 에러 반환 및 비용이 발생하는 LLM API 호출 원천 차단 | [ ] 미완료 | 결제 검증 미통과 시 AI 호출 차단 보안 가드 |
-| **BE-E2E-018** | `POST /api/ai/generate` | 텍스트 전용(1,500원) 상품 시 Gemini 4대 학파 해몽 생성 | `includes_image: false`인 유료 주문 건에 대해 생성 호출 | Gemini API 호출로 4대 학파 심층 리포트 생성, `dream_results` 저장(`image_url: null`) | [ ] 미완료 | JSON 규격 출력 파싱 및 마크다운 렌더링 데이터 보장 |
-| **BE-E2E-019** | `POST /api/ai/generate` | 이미지 포함(2,000원) 상품 시 이미지 생성 및 Storage 업로드 | `includes_image: true`인 유료 주문 건에 대해 생성 호출 | 텍스트 해몽 생성 + 영문 프롬프트 번역 + AI 이미지 생성 후 Supabase Storage 업로드 및 Public URL DB 저장 | [ ] 미완료 | 이미지 다운로드/업로드 실패 시 트랜잭션 예외 처리 |
-| **BE-E2E-020** | `POST /api/ai/generate` | AI API 장애(타임아웃/할당량 초과) 시 회복력 및 텔레그램 통보 | Gemini API 의도적 지연 또는 네트워크 단절 시뮬레이션 | 무한 대기 방지(Timeout 30초), `analysis_status` = 'failed' 기록, 텔레그램 에러 알림 발송 | [ ] 미완료 | 지수 백오프 재시도 및 실패 내역 가시화 |
-| **BE-E2E-021** | `GET /api/feeds` | 공개 피드 페이지네이션 및 비공개 꿈 격리 검증 | `page=1&limit=10` 파라미터 전달 및 비공개 꿈 포함 여부 확인 | `is_public: true` 조건의 데이터만 반환되며, `is_public: false` 데이터는 절대 반환되지 않음 | [ ] 미완료 | 개인 프라이버시 보호 및 민감한 꿈 내용 누출 차단 |
-| **BE-E2E-022** | Server Action `toggleDreamPublicAction` | 비회원/회원의 피드 공개 토글 시 소유권 검증 | 타인의 `dream_result_id`를 전달하여 공개 여부 조작 시도 | 세션/게스트 토큰과 `order_id` 매칭 불일치 감지, 403 차단 및 변조 방지 | [x] 완료 | HttpOnly 게스트 쿠키 추출 및 Service Role DB 격리 대조 완료 |
-| **BE-E2E-023** | `GET /api/admin/metrics` | 일반 사용자의 관리자 지표 API 직접 접근 차단 | 일반 회원/비회원 세션으로 `/api/admin/metrics` 호출 | 403 Forbidden 차단, `role: admin` 계정 요청 시에만 일별 매출/주문 집계 반환 | [x] 완료 | 관리자 권한 RBAC 인가 가드 검증 완료 |
-| **BE-E2E-024** | `GET /api/admin/orders` | 관리자 주문 목록 조회 시 dream_results 1:1 조인 무결성 | 관리자 권한으로 주문 리스트 페이지네이션 조회 | `orders`와 `dream_results` 1:1 매핑 데이터 단일 객체 바인딩 확인, N+1 쿼리 방지 | [x] 완료 | Server Action `getAdminOrders` 최적화 바인딩 완료 |
-| **BE-E2E-025** | `POST /api/admin/orders/[id]/regenerate` | 관리자 권한으로 특정 주문의 AI 해몽 강제 재생성 | 관리자 세션으로 주문 ID 및 재생성 요청 전달 | 관리자 권한 검증, 기존 해몽 이력 백업 후 AI 파이프라인 재가동, 텔레그램 재생성 보고 | [x] 완료 | 불량 결과물 발생 시 수동 A/S 재발행 통제 검증 완료 |
+| **BE-E2E-001** | 인증 및 세션 (`POST /api/auth/login`) | 지원하지 않는 소셜 프로바이더 요청 방어 | Body: `{ "provider": "unsupported_provider" }` | 400 Bad Request 및 "지원하지 않는 소셜 로그인 제공자입니다" 반환 | [x] 완료 | Google, Kakao 외 비인가 OAuth 요청 차단 검증 완료 |
+| **BE-E2E-002** | 인증 및 세션 (`GET /auth/callback`) | OAuth 코드 부재 또는 유효하지 않은 코드 수신 | 쿼리스트링에 `code` 누락 또는 변조된 임의 토큰 전달 | 500 에러 대신 `/auth?error=auth_callback_failed`로 안전 303 리다이렉트 | [x] 완료 | 프록시 `x-forwarded-host` 헤더 기반 프로덕션 도메인 산출 및 안전 폴백 라우팅 검증 완료 |
+| **BE-E2E-003** | 비회원 게스트 (`POST /api/auth/guest`) | 비회원 휴대폰 번호/비밀번호 형식 극단값 및 인증 성공 | 전화번호 10자리 미만 / 비밀번호 4자리 미만 / 정상 게스트 정보 | 형식 미달 시 400 에러 차단, 정상 시 `dream_teller_guest_token` 쿠키 발급 및 게스트 프로필 반환 | [x] 완료 | 전화번호 하이픈 자동 포맷팅 및 쿠키 발급 정상 검증 완료 |
+| **BE-E2E-004** | 인증 및 세션 (`POST /api/auth/logout`) | 활성 회원/비회원 세션 종료 및 쿠키 무효화 | POST 요청 호출 (쿠키 포함 상태) | Supabase 세션 signOut 수행, `dream_teller_guest_token` 쿠키 삭제 및 200 반환 | [x] 완료 | 회원 및 비회원 잔여 쿠키 동시 무효화 확인 완료 |
+| **BE-E2E-005** | 회원 프로필 (`GET /api/users/me`) | 미인증 사용자의 내 프로필 조회 차단 | Authorization 헤더 및 세션 쿠키 없는 비인가 GET 요청 | 401 Unauthorized 에러 반환 및 사용자 개인정보 노출 차단 | [ ] 미완료 | Auth 미들웨어 및 세션 가드 적용 검증 필요 |
+| **BE-E2E-006** | 회원 프로필 (`PATCH /api/users/me`) | 닉네임 수정 시 공백/초장문/특수문자 입력 차단 | Body: `{ "nickname": "   " }` 또는 30자 초과 문자열 | 400 Bad Request 반환, 정상 닉네임(1~15자) 제출 시 `users.nickname` DB 업데이트 반영 | [ ] 미완료 | 인라인 유효성 검증 및 XSS 살균(Sanitization) 검증 필요 |
+| **BE-E2E-007** | 주문 무결성 (`POST /api/orders`) | 결제 금액 위변조(Tampering) 악의적 조작 차단 | 2,000원 상품(해몽+이미지)에 대해 `total_amount: 100` 변조 전송 | 서버 옵션 단가 정책과 대조하여 불일치 감지, 400 에러 및 주문서 생성 차단 | [x] 완료 | 서버 단가(1500/2000원) 엄격 대조 및 불일치 시 400 Bad Request 차단 구현 완료 |
+| **BE-E2E-008** | 비회원 주문 (`POST /api/orders`) | 비회원 주문서 생성 시 비밀번호 단방향 암호화 | 비회원 전화번호 및 평문 비밀번호("1234") 전달 | `users` 테이블에 게스트 생성, 비밀번호는 `guest_password_hash`(단방향 해시)로 저장, 평문 저장 절대 차단 | [ ] 미완료 | 개인정보보호법 및 비밀번호 암호화 저장 검증 |
+| **BE-E2E-009** | 주문 데이터 보안 (`GET /api/orders/[id]`) | 타인의 주문 상세 IDOR(직접 객체 참조) 접근 차단 | A 사용자의 세션으로 B 사용자의 `order_id` UUID 조회 | 403 Forbidden 또는 404 Not Found 반환으로 타인의 꿈 본문 및 결과 열람 차단 | [x] 완료 | 회원 세션 user_id 및 비회원 게스트 토큰 대조 IDOR 원천 차단 구현 완료 |
+| **BE-E2E-010** | 비회원 주문 격리 (`GET /api/orders/guest`) | 비회원 게스트 토큰 위변조 및 주문 격리 | 임의 생성한 비회원 토큰 전달 / 정상 발급 토큰 전달 | 변조 토큰 401 차단, 정상 토큰 시 해당 전화번호로 생성된 주문 목록만 격리 반환 | [ ] 미완료 | 타 비회원 주문과의 완벽한 데이터 격리 검증 |
+| **BE-E2E-011** | 토스 결제 승인 (`POST /api/payments/confirm`) | 토스 승인 요청 금액과 주문서 금액 불일치 거절 | `orders.total_amount`는 2,000원인데 클라이언트가 `amount: 1500`으로 승인 요청 | 토스 승인 API 호출 전 금액 대조 불일치로 승인 즉시 중단 및 400 반환 | [x] 완료 | 결제 무결성 사전 차단 로직 검증 완료 |
+| **BE-E2E-012** | 토스 결제 승인 (`POST /api/payments/confirm`) | 동일 주문번호 연속 재승인 시도 (동시성/Replay Attack) | 승인 완료(`paid`)된 주문에 대해 1초 내 중복 승인 요청 전송 | 멱등성(Idempotency) 보장으로 중복 토스 호출 차단, 기존 결제 완료 응답 안전 반환 | [x] 완료 | 중복 승인으로 인한 이중 과금 원천 방지 검증 완료 |
+| **BE-E2E-013** | 토스 결제 승인 (`POST /api/payments/confirm`) | 결제 승인 완료 및 텔레그램 알림·AI 파이프라인 트리거 | 유효한 paymentKey, orderId, amount 전달 | 토스 승인 성공 후 status='paid', approved_at 기록, 텔레그램 알림 발송 및 AI 생성 비동기 호출 | [x] 완료 | 토스페이먼츠 v2 주문서 승인 연동 완료 |
+| **BE-E2E-014** | 결제 실패 처리 (`POST /api/payments/fail`) | 결제 실패 사유 저장 및 관리자 실패 알림 | 잔액 부족, 한도 초과, 사용자 취소 코드 전달 | `orders.payment_status` = 'failed' 및 `error_message` 기록, 관리자 텔레그램 에러 보고 | [x] 완료 | 결제 실패 사유 DB 기록 API 구현 및 /payments/fail 마운트 연동 완료 |
+| **BE-E2E-015** | 결제 취소/환불 (`POST /api/payments/cancel`) | 결제 승인 후 취소/환불 요청 | 기결제된 `payment_key` 및 취소 사유 전달 | 토스 결제 취소 API 호출, `payment_status` = 'canceled' 변경 및 DB 갱신 | [ ] 미완료 | AI 생성 착수 전/시스템 오류 시 환불 처리 검증 |
+| **BE-E2E-016** | 토스 결제 웹훅 (`POST /api/payments/webhook`) | 토스페이먼츠 웹훅 위변조 방지 및 상태 동기화 | 변조된 서명(Signature) 전달 / 정상 웹훅 페이로드 수신 | 변조 요청 401 거절, 정상 웹훅 수신 시 주문 상태(`paid`/`canceled`) 비동기 자동 동기화 | [ ] 미완료 | 웹훅 시크릿 서명 검증 및 비동기 트랜잭션 안전성 |
+| **BE-E2E-017** | AI 해몽 파이프라인 (`POST /api/ai/generate`) | 미결제(`pending`/`failed`) 주문의 AI 분석 요청 차단 | 미결제 상태의 `order_id`로 AI 생성 엔드포인트 직접 호출 | 400/403 에러 반환 및 비용이 발생하는 LLM API 호출 원천 차단 | [ ] 미완료 | 결제 검증 미통과 시 AI 호출 차단 보안 가드 |
+| **BE-E2E-018** | AI 해몽 파이프라인 (`POST /api/ai/generate`) | 텍스트 전용(1,500원) 상품 시 Gemini 4대 학파 해몽 생성 | `includes_image: false`인 유료 주문 건에 대해 생성 호출 | Gemini API 호출로 4대 학파 심층 리포트 생성, `dream_results` 저장(`image_url: null`) | [ ] 미완료 | JSON 규격 출력 파싱 및 마크다운 렌더링 데이터 보장 |
+| **BE-E2E-019** | AI 해몽 파이프라인 (`POST /api/ai/generate`) | 이미지 포함(2,000원) 상품 시 이미지 생성 및 Storage 업로드 | `includes_image: true`인 유료 주문 건에 대해 생성 호출 | 텍스트 해몽 생성 + 영문 프롬프트 번역 + AI 이미지 생성 후 Supabase Storage 업로드 및 Public URL DB 저장 | [ ] 미완료 | 이미지 다운로드/업로드 실패 시 트랜잭션 예외 처리 |
+| **BE-E2E-020** | AI 파이프라인 회복력 (`POST /api/ai/generate`) | AI API 장애(타임아웃/할당량 초과) 시 회복력 및 텔레그램 통보 | Gemini API 의도적 지연 또는 네트워크 단절 시뮬레이션 | 무한 대기 방지(Timeout 30초), `analysis_status` = 'failed' 기록, 텔레그램 에러 알림 발송 | [ ] 미완료 | 지수 백오프 재시도 및 실패 내역 가시화 |
+| **BE-E2E-021** | 피드 및 공유 (`GET /api/feeds`) | 공개 피드 페이지네이션 및 비공개 꿈 격리 검증 | `page=1&limit=10` 파라미터 전달 및 비공개 꿈 포함 여부 확인 | `is_public: true` 조건의 데이터만 반환되며, `is_public: false` 데이터는 절대 반환되지 않음 | [ ] 미완료 | 개인 프라이버시 보호 및 민감한 꿈 내용 누출 차단 |
+| **BE-E2E-022** | 피드 및 공유 (`Server Action toggleDreamPublicAction`) | 비회원/회원의 피드 공개 토글 시 소유권 검증 | 타인의 `dream_result_id`를 전달하여 공개 여부 조작 시도 | 세션/게스트 토큰과 `order_id` 매칭 불일치 감지, 403 차단 및 변조 방지 | [x] 완료 | HttpOnly 게스트 쿠키 추출 및 Service Role DB 격리 대조 완료 |
+| **BE-E2E-023** | 관리자 운영 (`GET /api/admin/metrics`) | 일반 사용자의 관리자 지표 API 직접 접근 차단 | 일반 회원/비회원 세션으로 `/api/admin/metrics` 호출 | 403 Forbidden 차단, `role: admin` 계정 요청 시에만 일별 매출/주문 집계 반환 | [x] 완료 | 관리자 권한 RBAC 인가 가드 검증 완료 |
+| **BE-E2E-024** | 관리자 운영 (`GET /api/admin/orders`) | 관리자 주문 목록 조회 시 dream_results 1:1 조인 무결성 | 관리자 권한으로 주문 리스트 페이지네이션 조회 | `orders`와 `dream_results` 1:1 매핑 데이터 단일 객체 바인딩 확인, N+1 쿼리 방지 | [x] 완료 | Server Action `getAdminOrders` 최적화 바인딩 완료 |
+| **BE-E2E-025** | 관리자 운영 (`POST /api/admin/orders/[id]/regenerate`) | 관리자 권한으로 특정 주문의 AI 해몽 강제 재생성 | 관리자 세션으로 주문 ID 및 재생성 요청 전달 | 관리자 권한 검증, 기존 해몽 이력 백업 후 AI 파이프라인 재가동, 텔레그램 재생성 보고 | [x] 완료 | 불량 결과물 발생 시 수동 A/S 재발행 통제 검증 완료 |

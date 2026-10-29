@@ -18,6 +18,7 @@ export interface AuthContextType {
   session: Session | null;
   user: AuthUser | null;
   loading: boolean;
+  isLoggedIn: boolean;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
@@ -164,7 +165,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, signOut, refreshSession }}>
+    <AuthContext.Provider value={{ session, user, loading, isLoggedIn: Boolean(user), signOut, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );
