@@ -1,8 +1,9 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 /**
  * 서버 환경(Route Handler, Server Actions, Server Components)에서 사용하는 Supabase 클라이언트
+ * 최신 @supabase/ssr 규격(getAll, setAll)을 적용하여 청크 쿠키 및 세션 동기화를 보장합니다.
  */
 export const createClient = async () => {
   const cookieStore = await cookies();
@@ -12,21 +13,16 @@ export const createClient = async () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
+        setAll(cookiesToSet) {
           try {
-            cookieStore.set({ name, value, ...options });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
           } catch {
-            // Server Component에서는 쿠키를 직접 쓸 수 없을 수 있으므로 무시
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.delete({ name, ...options });
-          } catch {
-            // Server Component에서는 쿠키를 직접 삭제할 수 없을 수 있으므로 무시
+            // Server Component에서는 쿠키를 직접 쓸 수 없으므로 무시
           }
         },
       },

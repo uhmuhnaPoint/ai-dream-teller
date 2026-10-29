@@ -70,12 +70,7 @@ export const UserProfileHeader = ({
     if (!confirm('정말 로그아웃 하시겠습니까?')) return;
     try {
       setIsLoggingOut(true);
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('dream_teller_auth_session');
-      }
-      onLogout();
+      await onLogout();
       router.push('/');
     } catch (e) {
       console.error('로그아웃 중 오류:', e);

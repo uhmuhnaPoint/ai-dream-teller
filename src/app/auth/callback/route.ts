@@ -12,8 +12,11 @@ export const GET = async (request: Request) => {
   const code = searchParams.get('code');
   const next = searchParams.get('next') || '/dream-teller';
 
-  // 환경에 맞는 대상 도메인 산출 (개발: localhost / 프로덕트: 배포 도메인)
-  const baseUrl = origin && !origin.includes('localhost') ? origin : getBaseUrl();
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+  const baseUrl = forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : (origin && !origin.includes('localhost') ? origin : getBaseUrl());
 
   if (code) {
     try {

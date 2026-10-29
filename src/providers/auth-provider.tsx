@@ -112,18 +112,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    // 3. 브라우저 스토리지 이벤트 동기화 (다른 탭 또는 데모 로그인 발생 시)
+    // 3. 동일 탭 및 다른 탭 간 세션 동기화 이벤트
+    const handleSyncAuth = () => {
+      refreshSession();
+    };
+
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'dream_teller_auth_session') {
         refreshSession();
       }
     };
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('dream_teller_auth_change', handleSyncAuth);
+    window.addEventListener('focus', handleSyncAuth);
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('dream_teller_auth_change', handleSyncAuth);
+      window.removeEventListener('focus', handleSyncAuth);
     };
   }, [refreshSession, checkLocalStorageDemoSession]);
 
@@ -142,6 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // 로컬 스토리지 데모 세션 정리
       if (typeof window !== 'undefined') {
         localStorage.removeItem('dream_teller_auth_session');
+        window.dispatchEvent(new Event('dream_teller_auth_change'));
       }
 
       setSession(null);

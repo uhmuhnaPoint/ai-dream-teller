@@ -47,10 +47,12 @@ export const AuthCard = () => {
             timestamp: Date.now(),
           })
         );
+        // 전역 AuthProvider에 즉시 인증 변경 알림
+        window.dispatchEvent(new Event('dream_teller_auth_change'));
       }
       setTimeout(() => {
         router.push(next);
-      }, 600);
+      }, 300);
     } catch (e) {
       console.error(e);
       router.push(next);

@@ -23,6 +23,8 @@ import {
   UserCheck,
 } from 'lucide-react';
 
+import { useAuth } from '@/providers/auth-provider';
+
 /**
  * 마이페이지 메인 컨테이너 컴포넌트
  * - 로그인 회원 프로필, 닉네임 수정, 소셜 로그인 표시, 로그아웃
@@ -31,64 +33,49 @@ import {
  * - 비로그인 시 친절한 로그인 안내 및 1초 체험 모드 지원
  */
 export const MyPageContainer = () => {
+  const { user: authUser, loading: authLoading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<'calendar' | 'orders'>('calendar');
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [orders, setOrders] = useState<DreamPurchaseOrder[]>(DUMMY_PURCHASE_ORDERS);
   const [calendarEntries, setCalendarEntries] = useState<CalendarDreamEntry[]>(MY_PAGE_CALENDAR_ENTRIES);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(true); // 기본값 true(체험 또는 로그인)
-  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
 
-  // 세션 확인 (Supabase 및 로컬스토리지)
+  // AuthProvider에서 유저 정보를 받아 프로필 상태 갱신
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
+    if (authUser) {
+      const meta = authUser.user_metadata;
+      const parsedNickname =
+        typeof meta?.name === 'string' && meta.name.trim()
+          ? meta.name
+          : typeof meta?.full_name === 'string' && meta.full_name.trim()
+          ? meta.full_name
+          : undefined;
 
-        if (session?.user) {
-          setIsLoggedIn(true);
-          const meta = session.user.user_metadata;
-          const provider = (session.user.app_metadata?.provider as 'kakao' | 'google') || 'kakao';
+      setUserProfile((prev) => ({
+        ...prev,
+        id: authUser.id,
+        email: authUser.email || prev.email,
+        nickname: parsedNickname || prev.nickname,
+      }));
+    }
+  }, [authUser]);
 
-          setUserProfile((prev) => ({
-            ...prev,
-            id: session.user.id,
-            email: session.user.email || prev.email,
-            nickname: meta?.name || meta?.full_name || prev.nickname,
-            provider,
-          }));
-        } else if (typeof window !== 'undefined') {
-          // 로컬 스토리지 데모 세션 확인
-          const localSession = localStorage.getItem('dream_teller_auth_session');
-          if (localSession) {
-            try {
-              const parsed = JSON.parse(localSession);
-              if (parsed?.user) {
-                setIsLoggedIn(true);
-                setUserProfile((prev) => ({
-                  ...prev,
-                  nickname: parsed.user.user_metadata?.name || prev.nickname,
-                  email: parsed.user.email || prev.email,
-                }));
-              }
-            } catch {
-              setIsLoggedIn(true);
-            }
-          } else {
-            // 로컬스토리지나 Supabase 세션이 없더라도 사용자가 바로 볼 수 있게 유지하되 알림 배너 옵션 제공
-            setIsLoggedIn(true);
-          }
-        }
-      } catch (err) {
-        console.error('세션 확인 중 오류:', err);
-        setIsLoggedIn(true);
-      } finally {
-        setIsCheckingAuth(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
+  // 1초 체험 모드 활성화 핸들러
+  const handleEnableDemoMode = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        'dream_teller_auth_session',
+        JSON.stringify({
+          user: {
+            id: 'demo-scholar-user-01',
+            email: 'dreamer@psychology.art',
+            user_metadata: { name: '꿈을 기록하는 방랑자', avatar_url: '' },
+          },
+          timestamp: Date.now(),
+        })
+      );
+      window.dispatchEvent(new Event('dream_teller_auth_change'));
+    }
+  };
 
   // 닉네임 업데이트
   const handleUpdateNickname = (newNickname: string) => {
@@ -111,12 +98,16 @@ export const MyPageContainer = () => {
   };
 
   // 로그아웃 처리
-  const handleLogout = () => {
-    setIsLoggedIn(false);
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('로그아웃 처리 실패:', err);
+    }
   };
 
   // 비로그인 상태일 때의 안내 뷰
-  if (!isLoggedIn && !isCheckingAuth) {
+  if (!authLoading && !authUser) {
     return (
       <div className="w-full max-w-lg mx-auto my-12 bg-[#FAF8F5]/90 border border-[#E8E0D5] rounded-3xl p-8 text-center space-y-6 shadow-2xl shadow-purple-950/10">
         <div className="w-16 h-16 rounded-2xl bg-[#2D1B4E] border border-amber-400/30 flex items-center justify-center mx-auto text-amber-300 shadow-lg">
@@ -142,7 +133,7 @@ export const MyPageContainer = () => {
 
           <button
             type="button"
-            onClick={() => setIsLoggedIn(true)}
+            onClick={handleEnableDemoMode}
             className="w-full h-11 flex items-center justify-center gap-1.5 rounded-xl bg-[#F0EBE1] hover:bg-[#EAE4DC] text-xs font-semibold text-[#5D576B] transition-colors cursor-pointer"
           >
             <UserCheck className="w-4 h-4" />
