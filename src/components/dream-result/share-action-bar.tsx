@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Share2, Link2, Check, MessageCircle, Lock, Eye, Sparkles } from 'lucide-react';
+import { Share2, Link2, Check, MessageCircle, Lock, Eye, Sparkles, Loader2 } from 'lucide-react';
+import { toggleDreamPublicAction } from '@/app/actions/dream-result';
 
 interface ShareActionBarProps {
   orderId: string;
@@ -21,6 +22,34 @@ const ShareActionBar = ({
 }: ShareActionBarProps) => {
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [showKakaoNotice, setShowKakaoNotice] = useState<boolean>(false);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+
+  // 피드 공개 토글 핸들러: 낙관적 UI 업데이트 후 Server Action을 통해 DB의 is_public을 원자적으로 갱신
+  const handleTogglePublic = async () => {
+    if (isUpdating) return;
+    const nextPublic = !isPublic;
+    // UI 즉각 반영 (Optimistic)
+    onTogglePublic(nextPublic);
+    setIsUpdating(true);
+
+    try {
+      const result = await toggleDreamPublicAction({
+        orderNumber: orderId,
+        isPublic: nextPublic,
+      });
+
+      if (!result.success) {
+        console.error('공개 상태 업데이트 실패:', result.error);
+        // 실패 시 원래 상태로 롤백
+        onTogglePublic(isPublic);
+      }
+    } catch (err) {
+      console.error('공개 상태 업데이트 중 예외:', err);
+      onTogglePublic(isPublic);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   // 링크 복사
   const handleCopyLink = async () => {
@@ -65,10 +94,11 @@ const ShareActionBar = ({
               type="button"
               role="switch"
               aria-checked={isPublic}
-              onClick={() => onTogglePublic(!isPublic)}
+              disabled={isUpdating}
+              onClick={handleTogglePublic}
               className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${
                 isPublic ? 'bg-amber-600' : 'bg-stone-300'
-              }`}
+              } ${isUpdating ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               <span
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${

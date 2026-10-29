@@ -169,17 +169,39 @@ const PaymentsFlow = () => {
 
         if (!isMountedRef.current) return;
 
-        // 결제 수단 및 이용약관 UI 렌더링
-        const [methodWidget, agreeWidget] = await Promise.all([
-          widgets.renderPaymentMethods({
-            selector: '#payment-method',
-            variantKey: 'DEFAULT',
-          }),
-          widgets.renderAgreement({
+        // 1. 결제 수단 UI 렌더링 (공식 순차 호출 규격 준수)
+        const methodWidget = await widgets.renderPaymentMethods({
+          selector: '#payment-method',
+          variantKey: 'DEFAULT',
+        });
+
+        if (!isMountedRef.current) {
+          try {
+            await methodWidget?.destroy?.();
+          } catch {
+            // 무시
+          }
+          return;
+        }
+
+        // 2. 이용약관 UI 렌더링
+        let agreeWidget = null;
+        try {
+          agreeWidget = await widgets.renderAgreement({
             selector: '#agreement',
-            variantKey: 'AGREEMENT',
-          }),
-        ]);
+          });
+        } catch (agreeErr) {
+          console.warn('[TossPayments] 약관 위젯 렌더링 폴백 시도:', agreeErr);
+          // variantKey가 지정된 경우 재시도
+          try {
+            agreeWidget = await widgets.renderAgreement({
+              selector: '#agreement',
+              variantKey: 'AGREEMENT',
+            });
+          } catch {
+            // 약관 위젯 에러 시 결제 수단은 유지
+          }
+        }
 
         // 비동기 렌더링 도중 언마운트된 경우 (React Strict Mode) 새로 생성된 위젯 파괴
         if (!isMountedRef.current) {
@@ -202,6 +224,7 @@ const PaymentsFlow = () => {
         setIsWidgetLoading(false);
         setWidgetError(null);
       } catch (err) {
+        console.error('[TossPayments Widget Error]:', err);
         if (isMountedRef.current) {
           const message =
             err instanceof Error ? err.message : '토스 결제 모듈을 불러오는 중 오류가 발생했습니다.';

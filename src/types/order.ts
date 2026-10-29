@@ -34,6 +34,10 @@ export interface CreateOrderRequest {
   expertField: PerspectiveType;
   includesImage: boolean;
   totalAmount: number;
+  guestInfo?: {
+    phone: string;
+    password: string;
+  };
 }
 
 export interface CreateOrderResponse {

@@ -1,8 +1,10 @@
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 import HeroSection from '@/components/landing/hero-section';
 import BentoGrid from '@/components/landing/bento-grid';
 import RecentDreams from '@/components/landing/recent-dreams';
 import BottomCta from '@/components/landing/bottom-cta';
+import { getPublicDreams } from '@/lib/feeds-service';
 
 export const metadata: Metadata = {
   title: 'AI Dream Teller | 당신의 무의식이 보낸 비밀 신호, 심층 꿈 해몽',
@@ -27,16 +29,28 @@ export const metadata: Metadata = {
 };
 
 /**
+ * RecentDreamsAsyncSection:
+ * 비동기 Supabase DB 조회를 전담하는 내부 서버 컴포넌트입니다.
+ * Next.js 16 Partial Prefetching(PPR) 규격에 따라 Suspense boundary 내부에서 안전하게 실행됩니다.
+ */
+const RecentDreamsAsyncSection = async () => {
+  const initialPublicDreams = await getPublicDreams(12);
+  return <RecentDreams initialDreams={initialPublicDreams} />;
+};
+
+/**
  * Home: AI Dream Teller의 메인 랜딩 페이지입니다.
- * Server Component로 구성되어 SEO 최적화 메타데이터를 정적으로 제공하며,
- * 기획된 전환 퍼널(Hero -> Bento Grid -> Recent Feed -> Bottom CTA)을 순차적으로 렌더링합니다.
+ * 정적 셸(Hero, BentoGrid, BottomCta)은 빌드 타임에 프리렌더링되며,
+ * 동적 DB 조회 섹션은 Suspense로 래핑되어 최적의 체감 성능과 SEO를 제공합니다.
  */
 const Home = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <HeroSection />
       <BentoGrid />
-      <RecentDreams />
+      <Suspense fallback={<RecentDreams />}>
+        <RecentDreamsAsyncSection />
+      </Suspense>
       <BottomCta />
     </div>
   );

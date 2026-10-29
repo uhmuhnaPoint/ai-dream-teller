@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { confirmTossPayment, getTossPayment, TossApiError, TossPaymentResponse } from '@/lib/tosspayments';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { executeAiDreamPipeline } from '@/app/api/ai/generate/route';
 
 /**
  * POST /api/payments/confirm
@@ -154,6 +155,11 @@ export const POST = async (request: NextRequest) => {
         console.error('해몽 결과 초기화 실패:', dreamResultError.message);
       }
     }
+
+    // 7. 후속 비동기 AI 파이프라인 트리거 (Non-blocking: 결제 성공 응답을 지연시키지 않음)
+    executeAiDreamPipeline(order.id).catch((aiError) => {
+      console.error('[AI Trigger Error] 결제 승인 후 AI 파이프라인 실행 중 오류:', aiError);
+    });
 
     return NextResponse.json({
       success: true,
