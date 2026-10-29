@@ -23,6 +23,8 @@ import {
   UserCheck,
 } from 'lucide-react';
 
+import { useSearchParams } from 'next/navigation';
+import { PerspectiveType } from '@/types/dream-teller';
 import { useAuth } from '@/providers/auth-provider';
 
 /**
@@ -33,11 +35,20 @@ import { useAuth } from '@/providers/auth-provider';
  * - 비로그인 시 친절한 로그인 안내 및 1초 체험 모드 지원
  */
 export const MyPageContainer = () => {
+  const searchParams = useSearchParams();
   const { user: authUser, loading: authLoading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<'calendar' | 'orders'>('calendar');
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
   const [orders, setOrders] = useState<DreamPurchaseOrder[]>(DUMMY_PURCHASE_ORDERS);
   const [calendarEntries, setCalendarEntries] = useState<CalendarDreamEntry[]>(MY_PAGE_CALENDAR_ENTRIES);
+
+  // URL 쿼리 파라미터(?tab=orders) 감지하여 구매 내역 탭 바로 활성화
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'orders') {
+      setActiveTab('orders');
+    }
+  }, [searchParams]);
 
   // AuthProvider에서 유저 정보를 받아 프로필 상태 갱신
   useEffect(() => {
@@ -72,35 +83,52 @@ export const MyPageContainer = () => {
               order_number: string;
               created_at: string;
               dream_content: string;
-              expert_field: string;
+              expert_field: PerspectiveType;
               includes_image: boolean;
               total_amount: number;
               payment_status: string;
+              dream_results?: {
+                image_url?: string;
+                analysis_status?: string;
+              } | null;
             }
+
+            // 구매 내역 리스트용 매핑 (DreamPurchaseOrder 규격 준수)
             const mappedOrders: DreamPurchaseOrder[] = result.data.map((item: OrderApiItem) => {
-              const perspectiveMap: Record<string, string> = {
-                freud: '프로이트 정신분석',
-                jung: '융 분석심리학',
-                neuroscience: '현대 뇌과학',
-                gestalt: '게슈탈트',
-              };
               return {
                 orderId: item.order_number || item.id,
-                date: item.created_at ? item.created_at.split('T')[0] : '2026.10.29',
-                dreamTitle:
+                orderNumber: item.order_number || item.id,
+                createdAt: item.created_at ? item.created_at.split('T')[0] : '2026.10.29',
+                perspective: item.expert_field || 'jung',
+                title:
                   item.dream_content && item.dream_content.length > 28
                     ? `${item.dream_content.slice(0, 28)}...`
                     : item.dream_content || '심층 무의식 분석',
-                perspectiveName: perspectiveMap[item.expert_field] || '융 분석심리학',
-                hasArtwork: Boolean(item.includes_image),
+                summary: item.dream_content || '심층 무의식 분석 기록',
+                dreamStory: item.dream_content || '',
+                hasImage: Boolean(item.includes_image),
+                imageUrl: item.dream_results?.image_url || undefined,
                 price: item.total_amount,
-                resultUrl: `/dream-result/${item.order_number || item.id}`,
-                status: item.payment_status === 'paid' ? 'completed' : 'processing',
+                status: item.payment_status === 'paid' ? 'COMPLETED' : 'PROCESSING',
               };
             });
 
-            if (mappedOrders.length > 0) {
-              setOrders(mappedOrders);
+            setOrders(mappedOrders);
+
+            // 캘린더용 매핑 (paid 상태인 꿈 기록 동기화)
+            const mappedCalendar: CalendarDreamEntry[] = result.data
+              .filter((item: OrderApiItem) => item.payment_status === 'paid')
+              .map((item: OrderApiItem) => ({
+                orderId: item.order_number || item.id,
+                date: item.created_at ? item.created_at.split('T')[0] : '2026-10-29',
+                title: item.dream_content ? `${item.dream_content.slice(0, 20)}...` : '해독된 꿈',
+                perspective: item.expert_field || 'jung',
+                hasImage: Boolean(item.includes_image),
+                status: 'COMPLETED' as const,
+              }));
+
+            if (mappedCalendar.length > 0) {
+              setCalendarEntries(mappedCalendar);
             }
           }
         } catch (err) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { confirmTossPayment } from '@/lib/tosspayments';
+import { confirmTossPayment, getTossPayment, TossApiError, TossPaymentResponse } from '@/lib/tosspayments';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
@@ -10,7 +10,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
  * 1. 파라미터 무결성 검증 (paymentKey, orderId, amount)
  * 2. DB 주문서 대조: DB의 `total_amount`와 클라이언트 승인 요청 `amount`가 1원이라도 불일치 시 토스 API 호출 차단
  * 3. 멱등성(Idempotency) 및 동시성(Replay Attack) 방어: 이미 승인 완료(`paid`)된 주문 재요청 시 중복 과금 차단 및 기존 성공 응답 반환
- * 4. 토스페이먼츠 v1 승인 엔드포인트 호출 (Basic Auth via TOSS_SECRET_KEY)
+ * 4. 토스페이먼츠 승인 API 호출 (Basic Auth via TOSS_SECRET_KEY)
+ *    - ALREADY_PROCESSING_REQUEST / ALREADY_PROCESSED_PAYMENT 발생 시 결제 상태 조회로 안전하게 복구
  * 5. DB 원자적 상태 전이: `orders.payment_status = 'paid'` 및 `dream_results(analysis_status = 'processing')` 초기화
  */
 export const POST = async (request: NextRequest) => {
@@ -52,7 +53,7 @@ export const POST = async (request: NextRequest) => {
       );
     }
 
-    // 3. 멱등성 및 중복 승인(Replay Attack) 방어
+    // 3. 멱등성 및 중복 승인(Replay Attack) 방어 (이미 paid 상태인 경우 즉시 성공 반환)
     if (order.payment_status === 'paid') {
       return NextResponse.json({
         success: true,
@@ -66,12 +67,55 @@ export const POST = async (request: NextRequest) => {
       });
     }
 
-    // 4. 토스페이먼츠 승인 API 호출 (Basic Auth via TOSS_SECRET_KEY)
-    const paymentResult = await confirmTossPayment({
-      paymentKey,
-      orderId,
-      amount: Number(amount),
-    });
+    // 4. 토스페이먼츠 승인 API 호출 (동시성 충돌 감지 시 결제 조회로 복구)
+    let paymentResult: TossPaymentResponse;
+    try {
+      paymentResult = await confirmTossPayment({
+        paymentKey,
+        orderId,
+        amount: Number(amount),
+      });
+    } catch (confirmError) {
+      // 이미 처리 중이거나 처리된 결제 요청(React Strict Mode 또는 동시 재시도)인 경우
+      if (
+        confirmError instanceof TossApiError &&
+        (confirmError.code === 'ALREADY_PROCESSING_REQUEST' ||
+          confirmError.code === 'ALREADY_PROCESSED_PAYMENT')
+      ) {
+        // 토스 결제 상태를 직접 조회하여 정상 승인 여부 판별
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        try {
+          const verifiedPayment = await getTossPayment(paymentKey);
+          if (verifiedPayment.status === 'DONE') {
+            paymentResult = verifiedPayment;
+          } else {
+            throw confirmError;
+          }
+        } catch {
+          // 결제 조회 실패 시 DB에 다른 스레드가 이미 paid로 업데이트했는지 재확인
+          const { data: latestOrder } = await adminSupabase
+            .from('orders')
+            .select('*')
+            .eq('id', order.id)
+            .single();
+
+          if (latestOrder && latestOrder.payment_status === 'paid') {
+            return NextResponse.json({
+              success: true,
+              data: {
+                orderId: latestOrder.id,
+                orderNumber: latestOrder.order_number,
+                totalAmount: latestOrder.total_amount,
+                approvedAt: latestOrder.approved_at,
+              },
+            });
+          }
+          throw confirmError;
+        }
+      } else {
+        throw confirmError;
+      }
+    }
 
     const approvedAt = paymentResult.approvedAt || new Date().toISOString();
 

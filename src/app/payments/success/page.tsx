@@ -17,12 +17,19 @@ const PaymentSuccessContent = () => {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [paymentData, setPaymentData] = useState<{ orderId: string; totalAmount: number; orderName?: string } | null>(null);
 
+  // React 18/Strict Mode 중복 호출 방어 ref
+  const hasRequestedRef = React.useRef<boolean>(false);
+
   useEffect(() => {
     if (!paymentKey || !orderId || !amount) {
       setConfirmError('유효하지 않은 결제 승인 요청입니다. 필수 파라미터가 누락되었습니다.');
       setIsConfirming(false);
       return;
     }
+
+    // 이미 요청이 시작되었으면 중복 실행 방지
+    if (hasRequestedRef.current) return;
+    hasRequestedRef.current = true;
 
     const requestConfirm = async () => {
       try {
@@ -47,8 +54,6 @@ const PaymentSuccessContent = () => {
           totalAmount: Number(amount),
           orderName: result.data?.orderName,
         });
-
-        // 성공 시 드래프트는 정리 가능하나 안전을 위해 유지 또는 결과 페이지용 저장
       } catch (err) {
         const msg = err instanceof Error ? err.message : '결제 승인에 실패했습니다.';
         setConfirmError(msg);
@@ -90,10 +95,10 @@ const PaymentSuccessContent = () => {
             다시 결제하기
           </Link>
           <Link
-            href="/dream-teller"
+            href="/my-page?tab=orders"
             className="px-5 py-2.5 rounded-xl border border-stone-200 text-stone-600 text-xs font-semibold hover:bg-stone-50 transition-colors"
           >
-            꿈 내용 확인하기
+            주문 내역 확인하기
           </Link>
         </div>
       </div>
@@ -132,14 +137,20 @@ const PaymentSuccessContent = () => {
         </div>
       </div>
 
-      {/* 결과 확인 버튼 */}
-      <div className="pt-2">
+      {/* 액션 버튼 그룹 */}
+      <div className="pt-2 space-y-2.5">
         <Link
           href={`/dream-result/${paymentData?.orderId || orderId}`}
           className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl bg-[#1E1B2E] text-amber-200 font-bold text-sm hover:bg-[#2D2845] transition-all shadow-sm"
         >
           <span>해석 결과 확인 대기방으로 이동</span>
           <ArrowRight className="w-4 h-4" />
+        </Link>
+        <Link
+          href="/my-page?tab=orders"
+          className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-white border border-stone-200 text-stone-700 font-semibold text-xs hover:bg-stone-50 transition-colors"
+        >
+          <span>마이페이지 주문 내역 보기</span>
         </Link>
       </div>
     </div>

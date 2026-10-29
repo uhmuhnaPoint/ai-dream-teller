@@ -49,6 +49,15 @@ export interface TossPaymentErrorResponse {
   message: string;
 }
 
+export class TossApiError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(`[${code}] ${message}`);
+    this.name = 'TossApiError';
+    this.code = code;
+  }
+}
+
 /**
  * 클라이언트 사이드 토스페이먼츠 클라이언트 키를 안전하게 반환합니다.
  */
@@ -95,7 +104,37 @@ export const confirmTossPayment = async (
 
   if (!response.ok) {
     const errorData = responseData as TossPaymentErrorResponse;
-    throw new Error(`[${errorData.code || 'PAYMENT_CONFIRM_FAIL'}] ${errorData.message || '결제 승인에 실패했습니다.'}`);
+    throw new TossApiError(
+      errorData.code || 'PAYMENT_CONFIRM_FAIL',
+      errorData.message || '결제 승인에 실패했습니다.'
+    );
+  }
+
+  return responseData as TossPaymentResponse;
+};
+
+/**
+ * 서버 사이드 전용: paymentKey를 기반으로 토스페이먼츠 결제 상태를 직접 조회합니다.
+ * @param paymentKey 토스페이먼츠 결제 고유 키
+ */
+export const getTossPayment = async (paymentKey: string): Promise<TossPaymentResponse> => {
+  const authorization = getTossSecretAuthHeader();
+
+  const response = await fetch(`https://api.tosspayments.com/v1/payments/${paymentKey}`, {
+    method: 'GET',
+    headers: {
+      Authorization: authorization,
+    },
+  });
+
+  const responseData = await response.json();
+
+  if (!response.ok) {
+    const errorData = responseData as TossPaymentErrorResponse;
+    throw new TossApiError(
+      errorData.code || 'PAYMENT_FETCH_FAIL',
+      errorData.message || '결제 내역 조회에 실패했습니다.'
+    );
   }
 
   return responseData as TossPaymentResponse;
