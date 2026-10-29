@@ -30,7 +30,7 @@ const STORAGE_KEY = 'ai_dream_order_draft';
  */
 const PaymentsFlow = () => {
   const router = useRouter();
-  const { user: authUser, isLoggedIn } = useAuth();
+  const { user: authUser, loading: authLoading, isLoggedIn } = useAuth();
 
   // 주문 초안 데이터
   const [orderDraft, setOrderDraft] = useState<OrderDraftData | null>(null);
@@ -59,10 +59,16 @@ const PaymentsFlow = () => {
   const [widgetError, setWidgetError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  // 위젯 인스턴스 ref (토스페이먼츠 v2 위젯 객체)
+  // 위젯 인스턴스 ref (토스페이먼츠 v2 위젯 객체 및 파괴용 메서드 보관)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const widgetsRef = useRef<any>(null);
-  const isInitializedRef = useRef<boolean>(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const paymentMethodWidgetRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const agreementWidgetRef = useRef<any>(null);
+  const isInitializingRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(false);
+  const renderedCustomerKeyRef = useRef<string | null>(null);
 
   // 1. 세션 스토리지에서 꿈 주문 초안 로드
   useEffect(() => {
@@ -81,24 +87,77 @@ const PaymentsFlow = () => {
     }
   }, []);
 
-  // 2. 토스페이먼츠 위젯 초기화 (React Strict Mode 중복 초기화 방지 클린업)
+  // 2. 토스페이먼츠 위젯 초기화 (React Strict Mode 및 Auth 세션 변화 시 중복 렌더링 방지 및 destroy 클린업)
   useEffect(() => {
-    if (!orderDraft || isInitializedRef.current) return;
+    isMountedRef.current = true;
 
-    let isMounted = true;
+    // 초안 로딩 중이거나 인증 확인 중이거나 주문 초안이 없으면 대기
+    if (isLoadingDraft || authLoading || !orderDraft) {
+      return;
+    }
+
+    // 회원인 경우 authUser.id를 customerKey로 활용하여 결제수단 저장 지원, 비회원은 ANONYMOUS
+    const customerKey = authUser?.id || ANONYMOUS;
+
+    // 이미 동일한 customerKey로 위젯이 렌더링되어 있는 경우: 위젯을 파괴하지 않고 금액만 업데이트 (공식 권장 사항)
+    if (
+      widgetsRef.current &&
+      paymentMethodWidgetRef.current &&
+      renderedCustomerKeyRef.current === customerKey
+    ) {
+      widgetsRef.current
+        .setAmount({
+          currency: 'KRW',
+          value: orderDraft.totalAmount,
+        })
+        .catch((err: unknown) => {
+          console.warn('Toss widget setAmount update error:', err);
+        });
+      return;
+    }
+
+    // 비동기 초기화가 이미 진행 중인 경우 중복 호출 방지
+    if (isInitializingRef.current) {
+      return;
+    }
 
     const initTossWidget = async () => {
+      isInitializingRef.current = true;
+      setIsWidgetLoading(true);
+      setWidgetError(null);
+
       try {
-        setIsWidgetLoading(true);
-        setWidgetError(null);
+        // 기존에 렌더링된 위젯이 있다면 토스 공식 destroy() 메서드로 안전하게 제거
+        if (paymentMethodWidgetRef.current) {
+          try {
+            await paymentMethodWidgetRef.current.destroy?.();
+          } catch {
+            // 이미 제거된 경우 무시
+          }
+          paymentMethodWidgetRef.current = null;
+        }
+        if (agreementWidgetRef.current) {
+          try {
+            await agreementWidgetRef.current.destroy?.();
+          } catch {
+            // 이미 제거된 경우 무시
+          }
+          agreementWidgetRef.current = null;
+        }
+
+        // DOM 컨테이너 내부 정리
+        const methodEl = document.getElementById('payment-method');
+        if (methodEl) methodEl.innerHTML = '';
+        const agreeEl = document.getElementById('agreement');
+        if (agreeEl) agreeEl.innerHTML = '';
+
+        if (!isMountedRef.current) return;
 
         const clientKey = getTossClientKey();
         const tossPayments = await loadTossPayments(clientKey);
 
-        if (!isMounted) return;
+        if (!isMountedRef.current) return;
 
-        // 회원인 경우 authUser.id를 customerKey로 활용하여 결제수단 저장 지원, 비회원은 ANONYMOUS
-        const customerKey = authUser?.id || ANONYMOUS;
         const widgets = tossPayments.widgets({ customerKey });
         widgetsRef.current = widgets;
 
@@ -108,10 +167,10 @@ const PaymentsFlow = () => {
           value: orderDraft.totalAmount,
         });
 
-        if (!isMounted) return;
+        if (!isMountedRef.current) return;
 
         // 결제 수단 및 이용약관 UI 렌더링
-        await Promise.all([
+        const [methodWidget, agreeWidget] = await Promise.all([
           widgets.renderPaymentMethods({
             selector: '#payment-method',
             variantKey: 'DEFAULT',
@@ -122,27 +181,60 @@ const PaymentsFlow = () => {
           }),
         ]);
 
-        if (isMounted) {
-          isInitializedRef.current = true;
-          setIsWidgetLoading(false);
+        // 비동기 렌더링 도중 언마운트된 경우 (React Strict Mode) 새로 생성된 위젯 파괴
+        if (!isMountedRef.current) {
+          try {
+            await methodWidget?.destroy?.();
+          } catch {
+            // 무시
+          }
+          try {
+            await agreeWidget?.destroy?.();
+          } catch {
+            // 무시
+          }
+          return;
         }
+
+        paymentMethodWidgetRef.current = methodWidget;
+        agreementWidgetRef.current = agreeWidget;
+        renderedCustomerKeyRef.current = customerKey;
+        setIsWidgetLoading(false);
+        setWidgetError(null);
       } catch (err) {
-        if (isMounted) {
-          const message = err instanceof Error ? err.message : '토스 결제 모듈을 불러오는 중 오류가 발생했습니다.';
+        if (isMountedRef.current) {
+          const message =
+            err instanceof Error ? err.message : '토스 결제 모듈을 불러오는 중 오류가 발생했습니다.';
           setWidgetError(message);
           setIsWidgetLoading(false);
         }
+      } finally {
+        isInitializingRef.current = false;
       }
     };
 
     initTossWidget();
 
     return () => {
-      isMounted = false;
-      // React Strict Mode 언마운트 시 상태 초기화
-      isInitializedRef.current = false;
+      isMountedRef.current = false;
     };
-  }, [orderDraft, authUser]);
+  }, [isLoadingDraft, authLoading, orderDraft, authUser?.id]);
+
+  // 컴포넌트 페이지 이탈 시 위젯 자원 최종 해제
+  useEffect(() => {
+    return () => {
+      try {
+        paymentMethodWidgetRef.current?.destroy?.();
+      } catch {
+        // 무시
+      }
+      try {
+        agreementWidgetRef.current?.destroy?.();
+      } catch {
+        // 무시
+      }
+    };
+  }, []);
 
   // 3. 결제 요청 핸들러
   const handlePayment = async () => {
