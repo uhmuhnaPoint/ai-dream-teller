@@ -2,13 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Menu, X, Sparkles } from 'lucide-react';
+import { useAuth } from '@/providers/auth-provider';
 
 /**
  * Header: 전역 네비게이션 바 컴포넌트입니다.
- * Warm Ivory 글래스모피즘과 마법 도서관 무드를 살린 로고 스타일을 적용합니다.
+ * - Warm Ivory 글래스모피즘과 마법 도서관 무드를 살린 로고 스타일을 적용합니다.
+ * - 로그인 상태에 따라 로그인/비회원 주문 조회 또는 마이페이지/로그아웃 메뉴를 조건부 렌더링합니다.
  */
 const Header = () => {
+  const router = useRouter();
+  const { user, loading, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   // 모바일 Drawer 오픈 시 ESC 키 닫힘 및 배경 스크롤 잠금 관리
@@ -35,6 +40,16 @@ const Header = () => {
     setIsOpen(false);
   }, []);
 
+  // 로그아웃 수행 후 메인 화면으로 이동
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push('/');
+    } catch (err) {
+      console.error('[Header] 로그아웃 실패:', err);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3.5 bg-[#FAF8F5]/90 backdrop-blur-md border-b border-[#E8E0F8]/80 transition-all">
       {/* 사이트 브랜드 로고 */}
@@ -52,15 +67,29 @@ const Header = () => {
         <Link href="/feeds" className="hover:text-[#6B46C1] transition-colors">
           꿈 피드
         </Link>
-        <Link href="/auth" className="hover:text-[#6B46C1] transition-colors">
-          로그인
-        </Link>
-        <Link href="/guest-login" className="hover:text-[#6B46C1] transition-colors">
-          비회원 주문 조회
-        </Link>
-        <Link href="/my-page" className="hover:text-[#6B46C1] transition-colors">
-          마이페이지
-        </Link>
+        {!loading && user ? (
+          <>
+            <Link href="/my-page" className="hover:text-[#6B46C1] transition-colors">
+              마이페이지
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="hover:text-[#6B46C1] transition-colors cursor-pointer text-sm font-medium"
+            >
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <>
+            <Link href="/auth" className="hover:text-[#6B46C1] transition-colors">
+              로그인
+            </Link>
+            <Link href="/guest-login" className="hover:text-[#6B46C1] transition-colors">
+              비회원 주문 조회
+            </Link>
+          </>
+        )}
         <Link
           href="/dream-teller"
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1E1B2E] text-white text-xs font-semibold hover:bg-[#2D2438] transition-colors shadow-xs"
@@ -118,15 +147,32 @@ const Header = () => {
               <Link href="/dream-teller" className="py-2 text-[#6B46C1] font-bold" onClick={closeMenu}>
                 꿈 해몽 시작하기 ✨
               </Link>
-              <Link href="/auth" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
-                로그인
-              </Link>
-              <Link href="/guest-login" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
-                비회원 주문 조회
-              </Link>
-              <Link href="/my-page" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
-                마이페이지
-              </Link>
+              {!loading && user ? (
+                <>
+                  <Link href="/my-page" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
+                    마이페이지
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMenu();
+                      handleLogout();
+                    }}
+                    className="py-2 text-left hover:text-[#6B46C1] cursor-pointer"
+                  >
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/auth" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
+                    로그인
+                  </Link>
+                  <Link href="/guest-login" className="py-2 hover:text-[#6B46C1]" onClick={closeMenu}>
+                    비회원 주문 조회
+                  </Link>
+                </>
+              )}
             </nav>
           </div>
         </div>
