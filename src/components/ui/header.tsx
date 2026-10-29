@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Menu, X, Sparkles } from 'lucide-react';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -10,11 +10,18 @@ import { useAuth } from '@/providers/auth-provider';
  * Header: 전역 네비게이션 바 컴포넌트입니다.
  * - Warm Ivory 글래스모피즘과 마법 도서관 무드를 살린 로고 스타일을 적용합니다.
  * - 로그인 상태에 따라 로그인/비회원 주문 조회 또는 마이페이지/로그아웃 메뉴를 조건부 렌더링합니다.
+ * - 관리자 콘솔(/admin) 접속 시에는 별도 어드민 레이아웃을 사용하므로 렌더링되지 않습니다.
  */
 const Header = () => {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState<boolean>(false);
+
+  // 관리자 페이지 경로에서는 일반 헤더 숨김 처리
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
 
   // 모바일 Drawer 오픈 시 ESC 키 닫힘 및 배경 스크롤 잠금 관리
   useEffect(() => {

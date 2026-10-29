@@ -178,19 +178,47 @@
 
 ### 5.3 관리자 UX 페이지 구성 (Admin UX Pages)
 
-0. **공통 레이아웃**
-   - 좌측 네비게이션: 매출 조회, 주문 리스트
+0. **공통 레이아웃 (구현완료) [x]**
+   - **좌측 글로벌 네비게이션 (`AdminSidebar`)**:
+     - 브랜드 아이덴티티: DREAM TELLER ADMIN 로고 및 Mock Data Mode 안내 배너
+     - 메뉴 구성: 매출 대시보드(`/admin`), 주문 관리 리스트(`/admin/order-list`), 유저 관리(`/admin/user-list`)
+     - 서비스 연동: 사용자 서비스 홈(`/`, 새 탭) 빠른 바로가기 링크
+     - 운영자 영역: 하단 관리자 프로필 정보 표시 및 세션 로그아웃 트리거
+     - 모바일 반응형: 화면 크기 축소 시 배경 블러 오버레이가 적용된 슬라이드오버 Drawer 자동 지원
+   - **관리자 상단 헤더 (`AdminHeader`)**:
+     - 모바일 사이드바 열기 햄버거 메뉴 토글 버튼
+     - 현재 URL 경로 기반 동적 브레드크럼 및 메인 타이틀/부제목 표시
+     - 실시간 운영 지표 칩: '오늘 매출' 집계액 배지 표기
+     - 퀵 액션: 화면 데이터 새로고침 버튼 및 미확인 알림 인디케이터
+   - **레이아웃 쉘 및 컴포넌트 격리 (`AdminShell`, `AdminLayout`)**:
+     - 데스크톱 고정 좌측 사이드바(260px)와 유연한 콘텐츠 뷰포트의 일체형 그리드 구조
+     - 일반 소비자 헤더/푸터 격리: `/admin` 하위 경로 진입 시 일반 사용자용 Header/Footer 자동 숨김 처리 및 Next.js 16 빌드 호환을 위한 루트 `<Suspense>` 적용
+   - **타입 및 데이터 연동 규격 사전 구축**:
+     - PRD 6.6 어드민 API 규격과 1:1 호환되는 TypeScript Interface(`src/types/admin.ts`) 및 모의 데이터 공급자(`src/lib/admin-mock-data.ts`) 구현 완료 (추후 Server Actions 즉시 교체 가능 구조)
 
-1. **관리자 메인 (`/admin`)**
+1. **관리자 메인 (`/admin`) (구현완료) [x]**
    - 매출 대시보드, 핵심 지표 카드, 8개월 차트, Shadcn/UI Card, Lucide 아이콘, 반응형 Drawer
+   - 백엔드 실데이터 연동: `getAdminMetrics()` 및 `getAdminOrders()` Server Actions 실시간 데이터 바인딩 완료
 
-2. **주문 리스트 (`/admin/order-list`)**
-   - 주문 ID, 일시, 닉네임, 구분, 분야, 금액, 상태 배지, 실시간 필터링
 
-3. **주문 상세 (`/admin/order-list/[order-id]`)**
-   - 구매자 정보, 결제 정보, 입력 꿈 텍스트, 선택 관점, AI 해몽 리포트·이미지, 재생성 트리거 버튼
+2. **주문 리스트 (`/admin/order-list`) (구현완료) [x]**
+   - 주문 ID/일시, 닉네임, 회원 구분(회원/게스트), 전문 분야, 결제 금액, 결제/분석 상태 배지, 꿈 본문 요약 그리드
+   - 실시간 다중 필터링: 검색어(주문번호·닉네임·연락처·꿈내용), 결제 상태, AI 해몽 상태, 전문 학파, 회원/비회원 구분 및 원클릭 필터 초기화
+   - 상세 보기 연동: 테이블 행 클릭 시 즉시 팝업되는 '주문 상세 모달' 및 별도 페이지 열기 지원
 
-4. **유저 리스트 (`/admin/user-list`)**
+3. **주문 상세 (`/admin/order-list/[order-id]`) (구현완료) [x]**
+   - 구매자 정보(회원/비회원 식별, 닉네임, 이메일, 전화번호), 결제 정보(결제 상태, 금액, 패키지 옵션, 승인일시, 토스 승인키)
+   - 유저 입력 꿈 텍스트 원문 및 선택 학파 표기
+   - AI 심층 해몽 리포트 결과(타이틀, 요약, AI 비주얼라이제이션 이미지, 심층 해석 본문, 학파별 분석, 행동 권고안)
+   - AI 품질 이슈 대응: **AI 해몽 재생성 트리거 버튼** (PRD 6.6 `POST /api/admin/orders/[id]/regenerate` 연동 대비 완료)
+   - 모달 팝업(`OrderDetailModal`) 및 전용 페이지 URL(`OrderDetailView`) 듀얼 모드 지원으로 업무 효율 극대화
+
+4. **유저 리스트 (`/admin/user-list`) (구현완료) [x]**
+   - 핵심 요약 지표 카드: 총 등록 고객 수, 정회원(소셜 가입) 수 및 비율, 비회원(게스트 계정) 수, 누적 결제 총액 및 고객당 평균 객단가
+   - 고객 식별 그리드: 닉네임, 계정 고유 ID(UUID), 회원 구분(회원/게스트/어드민), 가입 제공자(카카오/구글/게스트), 연락처(전화번호 식별자), 이메일, 누적 주문 건수, 총 결제 금액, 최초 등록일시 및 최근 주문일시
+   - 실시간 다중 필터링: 닉네임·이메일·전화번호·ID 통합 검색, 고객 유형별 필터(회원/게스트/관리자), 가입 수단별 필터 및 초기화
+   - 고객별 주문 이력 팝업: 고객 행 또는 [내역] 버튼 클릭 시 해당 고객의 과거 꿈 해몽 주문 이력을 조회하고 주문 상세 페이지로 즉시 연결하는 모달 지원
+   - 백엔드 연동 규격: PRD 6.6 `GET /api/admin/users` (Server Action `getAdminUsers`) 반환 규격 준수
 
 ## 6. 백엔드 요구사항 및 API 구조 (Backend Requirements & API Structure)
 
@@ -378,17 +406,19 @@
 - **기술적 특이사항 (중요)**
   - **Server Actions 전환**: 클라이언트 사이드 `fetch` 시 발생하는 Next.js 미들웨어의 401/403 인증 이슈를 해결하기 위해 모든 관리자 데이터 조회 로직을 `src/app/actions/admin.ts`의 Server Actions로 전환하여 구현함.
   - **데이터 조인 최적화**: `orders`와 `dream_results` 간의 1:1 관계(UNIQUE FK)에 따른 PostgREST의 단일 객체 반환 특성을 고려하여 프런트엔드 데이터 바인딩 로직을 안정화함.
+  - **코드 보안 및 민감 정보 분리**: `ADMIN_SECRET_KEY`, `ADMIN_MASTER_PASSCODE`, `ADMIN_AUTHORIZED_EMAILS`를 환경 변수 및 독립 보안 모듈(`src/lib/security/admin-auth.ts`)로 완전 격리하여 클라이언트 번들에 노출되지 않도록 서버 사이드 인가 체계를 수립함.
 
-- `GET /api/admin/metrics` (구현완료 - Server Action `getAdminMetrics` 병행 가능) [x]
-  - 설명: 관리자 대시보드용으로 기간별 매출과 주문 통계 데이터를 반환합니다.
-- `GET /api/admin/orders` (구현완료 - Server Action `getAdminOrders`) [x]
+- `GET /api/admin/metrics` (구현완료 - Server Action `getAdminMetrics` 연동 완료) [x]
+  - 설명: 관리자 대시보드용으로 기간별 매출과 주문 통계 데이터를 반환합니다. 오늘/당월/누적 매출, 8개월 트렌드, 학파/플랜 분포 집계를 실시간 제공합니다.
+- `GET /api/admin/orders` (구현완료 - Server Action `getAdminOrders` 연동 완료) [x]
   - 설명: 시스템 전체의 주문 발생 내역 리스트를 페이지네이션 및 필터와 함께 반환합니다. `dream_results`의 생성 상태(`analysis_status`)를 포함합니다.
-- `GET /api/admin/orders/[id]` (구현완료 - Server Action `getAdminOrderDetail`) [x]
-  - 설명: 상세 주문 내역에서 원본 꿈 텍스트, 사용자 정보, 결제 상태 및 해몽 결과를 반환합니다. `dream_results`는 단일 객체 형태로 매핑됩니다.
-- `POST /api/admin/orders/[id]/regenerate` (구현완료) [x]
-  - 설명: 결과물 품질 이슈 등을 이유로 LLM 해몽 재생성을 트리거합니다. 관리자 전용 권한 확인 후 AI 파이프라인을 재가동합니다.
-- `GET /api/admin/users` (구현완료 - Server Action `getAdminUsers`) [x]
+- `GET /api/admin/orders/[id]` (구현완료 - Server Action `getAdminOrderDetail` 연동 완료) [x]
+  - 설명: 상세 주문 내역에서 원본 꿈 텍스트, 사용자 정보, 결제 상태 및 해몽 결과를 반환합니다. `dream_results`는 단일 객체 형태로 매핑되며 마크다운 파싱을 통해 구조화된 리포트를 제공합니다.
+- `POST /api/admin/orders/[id]/regenerate` (구현완료 - Server Action `regenerateAiDreamReport` 연동 완료) [x]
+  - 설명: 결과물 품질 이슈 등을 이유로 LLM 해몽 재생성을 트리거합니다. 관리자 전용 권한 확인 후 AI 파이프라인을 재가동하고 운영자 텔레그램 알림을 발송합니다.
+- `GET /api/admin/users` (구현완료 - Server Action `getAdminUsers` 연동 완료) [x]
   - 설명: 회원 가입 유저와 비회원 유저 리스트를 조회하고, 각 유저별 누적 주문 및 결제 건수를 합산하여 반환합니다. `phone_number` 필드를 식별자로 사용합니다.
+
 
 ## 7. 데이터베이스 스키마 (Database Schema)
 

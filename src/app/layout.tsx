@@ -1,3 +1,4 @@
+import React, { Suspense } from 'react';
 import './globals.css';
 import Header from '@/components/ui/header';
 import Footer from '@/components/ui/footer';
@@ -15,15 +16,20 @@ interface RootLayoutProps {
 /**
  * RootLayout: 전역 레이아웃 컴포넌트입니다.
  * AuthProvider를 통해 애플리케이션 전체에 Supabase 인증 컨텍스트를 제공합니다.
+ * usePathname 훅을 사용하는 Header와 Footer를 Suspense로 감싸 정적 프리렌더링 호환성을 보장합니다.
  */
 const RootLayout = ({ children }: RootLayoutProps) => {
   return (
     <html lang="ko">
       <body className="flex flex-col min-h-screen bg-[#FAF8F5] text-[#1E1B2E] antialiased selection:bg-[#E8E0F8] selection:text-[#1E1B2E]">
         <AuthProvider>
-          <Header />
+          <Suspense fallback={null}>
+            <Header />
+          </Suspense>
           <main className="flex-1">{children}</main>
-          <Footer />
+          <Suspense fallback={null}>
+            <Footer />
+          </Suspense>
         </AuthProvider>
       </body>
     </html>

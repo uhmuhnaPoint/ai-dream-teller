@@ -1,11 +1,21 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 
 /**
  * Footer: 전역 푸터 컴포넌트입니다.
  * 사업자 등록 정보, 법적 고지(이용약관, 개인정보처리방침), 문의 링크를 제공합니다.
+ * 관리자 콘솔(/admin)에서는 렌더링되지 않습니다.
  */
 const Footer = () => {
+  const pathname = usePathname();
+
+  // 관리자 페이지 경로에서는 일반 푸터 숨김 처리
+  if (pathname?.startsWith('/admin')) {
+    return null;
+  }
   return (
     <footer className="bg-[#FAF8F5] border-t border-[#E8E0F8] text-[#716A89] py-12 px-4 sm:px-8">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-start justify-between gap-8">
